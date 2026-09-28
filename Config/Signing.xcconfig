@@ -1,0 +1,8 @@
+// Contributor builds need no developer account. Distribution supplies signing settings.
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM =
+PAD_DISTRIBUTION_SIGNING_STYLE = Automatic
+PAD_DISTRIBUTION_PROFILE =
+#include? "Local.xcconfig"
+#include? "Cloud.xcconfig"

@@ -12,3 +12,10 @@ Config/Cloud.xcconfig
 *.p12
 *.mobileprovision
 *.provisionprofile
+_local/
+_tmp/
+_ignore/
+*.keychain-db
+*.key
+*.p8
+*.log

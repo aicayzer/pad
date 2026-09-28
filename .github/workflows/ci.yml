@@ -1,0 +1,81 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      window_tests:
+        description: Run suites that open windows on the disposable hosted runner
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  app:
+    name: App
+    # GitHub-hosted macOS 27 image: actions/runner-images issue 14404.
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -version | head -1 | grep -E '^Xcode 27([.]|$)'
+          test "$(sw_vers -productVersion | cut -d. -f1)" = 27
+      - name: Install XcodeGen
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Verify generated project
+        run: |
+          xcodegen generate
+          git diff --exit-code -- Pad.xcodeproj App/Info.plist App/Pad.entitlements
+          test -z "$(git ls-files --others --exclude-standard Pad.xcodeproj App/Info.plist App/Pad.entitlements)"
+      - name: Build and test
+        env:
+          TEST_RUNNER_PAD_WINDOW_TESTS: ${{ github.event_name != 'workflow_dispatch' && '1' || (inputs.window_tests && '1' || '') }}
+        run: |
+          set -o pipefail
+          xcodebuild -project Pad.xcodeproj -scheme Pad -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build/CI \
+            -resultBundlePath build/Tests.xcresult -parallel-testing-enabled NO \
+            -skip-testing:PadTests/PanelTests -skip-testing:PadTests/FilenameInputTests \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= test | tee build.log
+      - name: Test native windows sequentially
+        if: github.event_name != 'workflow_dispatch' || inputs.window_tests
+        env:
+          TEST_RUNNER_PAD_WINDOW_TESTS: '1'
+        run: |
+          set -o pipefail
+          for suite in FilenameInputTests PanelTests; do
+            xcodebuild -project Pad.xcodeproj -scheme Pad -configuration Debug \
+              -destination 'platform=macOS' -derivedDataPath build/CI \
+              -resultBundlePath "build/$suite.xcresult" -parallel-testing-enabled NO \
+              "-only-testing:PadTests/$suite" \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= test | tee -a build.log
+          done
+      - name: Test application interactions
+        if: github.event_name != 'workflow_dispatch' || inputs.window_tests
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          sudo /usr/sbin/DevToolsSecurity -enable
+          xcodebuild -project Pad.xcodeproj -scheme 'Pad UI Tests' -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build/UI \
+            -resultBundlePath build/UI.xcresult -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test | tee -a build.log
+      - name: Build Release
+        run: |
+          xcodebuild -project Pad.xcodeproj -scheme Pad -configuration Release \
+            -destination 'platform=macOS' -derivedDataPath build/CI \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= build
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results
+          path: |
+            build.log
+            build/*.xcresult

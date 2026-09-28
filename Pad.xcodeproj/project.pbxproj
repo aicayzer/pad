@@ -1,0 +1,693 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		08C4CCDBFAEBCEA878B7136A /* PadFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C08C107A050CE1BE5CFD47 /* PadFilename.swift */; };
+		0CAAEF1C3A635923D1279E8C /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C376BFA6787DB6FC30A88D8B /* AppSettings.swift */; };
+		1A4EBF4B1DBF34CEADA7E2B8 /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EE3051475194A0CE9CC409 /* Shortcuts.swift */; };
+		269569C2B306932754F49196 /* DocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89C30E859A54BC39F6D3B16 /* DocumentTests.swift */; };
+		27853BDC976688B83D91EB55 /* PadPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C1A9D1A42A38485980FBF8 /* PadPanel.swift */; };
+		42356443B8A156132E766111 /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC1CF8AF4A606ECB6356B6E /* SettingsTests.swift */; };
+		4AA5982F109490D3B74FBED0 /* FilenameInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2694A6E13E03EDC77FA2FD0 /* FilenameInputTests.swift */; };
+		4BBBABE5E8263E98D11E059A /* PanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2187E3E013FE86C3489E5628 /* PanelTests.swift */; };
+		52C93C566913D64AD4B6F467 /* OpensWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = E538FE74AA4DB07FF073916E /* OpensWindows.swift */; };
+		56B2968316BB77C15DB0AC99 /* OverlaySearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37EF93D16D030F218B3225EE /* OverlaySearchField.swift */; };
+		6B6D46D5A693330673E58DE1 /* PadNamingSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5F9400C1E9EF196E78434E /* PadNamingSettings.swift */; };
+		713004856210BCA181389388 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 1C342CF42DD9556B1B21F222 /* KeyboardShortcuts */; };
+		72F23CF65A1E51473CA9B6F3 /* LoginItemSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD0E2FE5F4ED346DE0AF7E3 /* LoginItemSettings.swift */; };
+		88BD1FD4C14239700DDF38BF /* FilenameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA792584AF84059A2B6EDBA4 /* FilenameTests.swift */; };
+		9AF5F3D82CC644C13E8468A9 /* PadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D4F8125561D81326487221 /* PadApp.swift */; };
+		9F2D8028F851B85DEF4B513B /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B9385ADB1CD28DEBD5021C16 /* AppIcon.icon */; };
+		A773212ECD37748C92EC805B /* Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FEF301DA1CA940EC7E4697 /* Commands.swift */; };
+		AEECD88F21AC692E219E1451 /* AppIconDEV.icon in Resources */ = {isa = PBXBuildFile; fileRef = 621D41FA4140656C065BF7AB /* AppIconDEV.icon */; };
+		BEB7038FF6BEAE822F7FDD53 /* DevelopmentBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */; };
+		C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A999B97A56ADD25994D11B77 /* PadUITests.swift */; };
+		D52ADB49D8B0EF9B37F57D43 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8973E101DCBB6B34544E1C63 /* AppDelegate.swift */; };
+		D546D3C0B92484843E80398A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D843D996E9C2857B0E6072A1 /* Assets.xcassets */; };
+		D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */; };
+		D8853F2F3F9F7611671BAB1D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 646AFD26F1EFB796B0DF5232 /* PrivacyInfo.xcprivacy */; };
+		E84E2DEC4BABDF3C1D25B4B7 /* WindowReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3253C726F81CFFFEAA0D8B /* WindowReader.swift */; };
+		F7515E64199E441474ECBFC3 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933726A377415C032B720BA9 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A08825A5F349CEF9F9FBDF51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7141872703165A7B95D038A4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 19593A2206F90461DC77130F;
+			remoteInfo = Pad;
+		};
+		BEF99762AD018DF50CA8C625 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7141872703165A7B95D038A4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 19593A2206F90461DC77130F;
+			remoteInfo = Pad;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0AC85B4C5EF3BDE2FF730BC8 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		1F25C3713587E03DED4F2128 /* PadUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PadUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2187E3E013FE86C3489E5628 /* PanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelTests.swift; sourceTree = "<group>"; };
+		22FEF301DA1CA940EC7E4697 /* Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Commands.swift; sourceTree = "<group>"; };
+		28C281F3B441312B4BE4E113 /* Pad.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pad.entitlements; sourceTree = "<group>"; };
+		30C08C107A050CE1BE5CFD47 /* PadFilename.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadFilename.swift; sourceTree = "<group>"; };
+		34C1A9D1A42A38485980FBF8 /* PadPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadPanel.swift; sourceTree = "<group>"; };
+		37EF93D16D030F218B3225EE /* OverlaySearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlaySearchField.swift; sourceTree = "<group>"; };
+		4CC1CF8AF4A606ECB6356B6E /* SettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTests.swift; sourceTree = "<group>"; };
+		621D41FA4140656C065BF7AB /* AppIconDEV.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIconDEV.icon; sourceTree = "<group>"; };
+		646AFD26F1EFB796B0DF5232 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		6693BC5C8FE6E04C011F7632 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6D5F9400C1E9EF196E78434E /* PadNamingSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadNamingSettings.swift; sourceTree = "<group>"; };
+		8973E101DCBB6B34544E1C63 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		933726A377415C032B720BA9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A2694A6E13E03EDC77FA2FD0 /* FilenameInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameInputTests.swift; sourceTree = "<group>"; };
+		A999B97A56ADD25994D11B77 /* PadUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadUITests.swift; sourceTree = "<group>"; };
+		B89C30E859A54BC39F6D3B16 /* DocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTests.swift; sourceTree = "<group>"; };
+		B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadDocument.swift; sourceTree = "<group>"; };
+		B9385ADB1CD28DEBD5021C16 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		BA792584AF84059A2B6EDBA4 /* FilenameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameTests.swift; sourceTree = "<group>"; };
+		BAD0E2FE5F4ED346DE0AF7E3 /* LoginItemSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItemSettings.swift; sourceTree = "<group>"; };
+		C376BFA6787DB6FC30A88D8B /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		D0EE3051475194A0CE9CC409 /* Shortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shortcuts.swift; sourceTree = "<group>"; };
+		D843D996E9C2857B0E6072A1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DB3253C726F81CFFFEAA0D8B /* WindowReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowReader.swift; sourceTree = "<group>"; };
+		DD48B4B123B65A0DFCAD4B8D /* Pad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1D4F8125561D81326487221 /* PadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadApp.swift; sourceTree = "<group>"; };
+		E538FE74AA4DB07FF073916E /* OpensWindows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpensWindows.swift; sourceTree = "<group>"; };
+		F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentBadge.swift; sourceTree = "<group>"; };
+		FD7CF2FD18E4F9D6EC9BA2DB /* PadTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PadTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		812EDEB1F0209F0E33A174E5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				713004856210BCA181389388 /* KeyboardShortcuts in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0FB4E76EBB7BE3D6BF49C4D2 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B9385ADB1CD28DEBD5021C16 /* AppIcon.icon */,
+				621D41FA4140656C065BF7AB /* AppIconDEV.icon */,
+				D843D996E9C2857B0E6072A1 /* Assets.xcassets */,
+				646AFD26F1EFB796B0DF5232 /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		20483AF36C1E7453A8FCB403 = {
+			isa = PBXGroup;
+			children = (
+				F0B718D3EB2216D05207A714 /* App */,
+				6C1A45C45EF0260147361126 /* Config */,
+				BB9985B62F85390D0E9173B1 /* Tests */,
+				A6D7499B2BBCA2AEC185E3F2 /* UITests */,
+				A3286833D6DD32E08BD1534E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		43B280BCEBE6B4173E9C0571 /* Document */ = {
+			isa = PBXGroup;
+			children = (
+				B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */,
+				30C08C107A050CE1BE5CFD47 /* PadFilename.swift */,
+				6D5F9400C1E9EF196E78434E /* PadNamingSettings.swift */,
+				34C1A9D1A42A38485980FBF8 /* PadPanel.swift */,
+			);
+			path = Document;
+			sourceTree = "<group>";
+		};
+		6C1A45C45EF0260147361126 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				0AC85B4C5EF3BDE2FF730BC8 /* Signing.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		81A1BC3F9413D638137A10F2 /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				37EF93D16D030F218B3225EE /* OverlaySearchField.swift */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		A3286833D6DD32E08BD1534E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DD48B4B123B65A0DFCAD4B8D /* Pad.app */,
+				FD7CF2FD18E4F9D6EC9BA2DB /* PadTests.xctest */,
+				1F25C3713587E03DED4F2128 /* PadUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A6D7499B2BBCA2AEC185E3F2 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				A999B97A56ADD25994D11B77 /* PadUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		BB9985B62F85390D0E9173B1 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				B89C30E859A54BC39F6D3B16 /* DocumentTests.swift */,
+				A2694A6E13E03EDC77FA2FD0 /* FilenameInputTests.swift */,
+				BA792584AF84059A2B6EDBA4 /* FilenameTests.swift */,
+				E538FE74AA4DB07FF073916E /* OpensWindows.swift */,
+				2187E3E013FE86C3489E5628 /* PanelTests.swift */,
+				4CC1CF8AF4A606ECB6356B6E /* SettingsTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		F0B718D3EB2216D05207A714 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				43B280BCEBE6B4173E9C0571 /* Document */,
+				81A1BC3F9413D638137A10F2 /* Editor */,
+				0FB4E76EBB7BE3D6BF49C4D2 /* Resources */,
+				8973E101DCBB6B34544E1C63 /* AppDelegate.swift */,
+				C376BFA6787DB6FC30A88D8B /* AppSettings.swift */,
+				22FEF301DA1CA940EC7E4697 /* Commands.swift */,
+				F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */,
+				6693BC5C8FE6E04C011F7632 /* Info.plist */,
+				BAD0E2FE5F4ED346DE0AF7E3 /* LoginItemSettings.swift */,
+				28C281F3B441312B4BE4E113 /* Pad.entitlements */,
+				E1D4F8125561D81326487221 /* PadApp.swift */,
+				933726A377415C032B720BA9 /* SettingsView.swift */,
+				D0EE3051475194A0CE9CC409 /* Shortcuts.swift */,
+				DB3253C726F81CFFFEAA0D8B /* WindowReader.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		19593A2206F90461DC77130F /* Pad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F7DFCCB8848678BA99DA3D82 /* Build configuration list for PBXNativeTarget "Pad" */;
+			buildPhases = (
+				81C4D389AA2F0F3F96EC590A /* Sources */,
+				4E1006A4F71AFC10D1790774 /* Resources */,
+				812EDEB1F0209F0E33A174E5 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Pad;
+			packageProductDependencies = (
+				1C342CF42DD9556B1B21F222 /* KeyboardShortcuts */,
+			);
+			productName = Pad;
+			productReference = DD48B4B123B65A0DFCAD4B8D /* Pad.app */;
+			productType = "com.apple.product-type.application";
+		};
+		834BFCE6C14AD072CC3B69B0 /* PadTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 22FF90D9A18493BF50FF7AC4 /* Build configuration list for PBXNativeTarget "PadTests" */;
+			buildPhases = (
+				96618ACD72C7F72D1765C4D0 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CFE9B9DD3085F776E9366E56 /* PBXTargetDependency */,
+			);
+			name = PadTests;
+			packageProductDependencies = (
+			);
+			productName = PadTests;
+			productReference = FD7CF2FD18E4F9D6EC9BA2DB /* PadTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F6608D6CBE0432B58248FB2E /* PadUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 84747F92E2A5C00F0BC13D4C /* Build configuration list for PBXNativeTarget "PadUITests" */;
+			buildPhases = (
+				A389263C346BABD4621DCDF1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				968BD580BEF6DD5120C2577C /* PBXTargetDependency */,
+			);
+			name = PadUITests;
+			packageProductDependencies = (
+			);
+			productName = PadUITests;
+			productReference = 1F25C3713587E03DED4F2128 /* PadUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7141872703165A7B95D038A4 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					19593A2206F90461DC77130F = {
+						DevelopmentTeam = "";
+					};
+					834BFCE6C14AD072CC3B69B0 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					F6608D6CBE0432B58248FB2E = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 19593A2206F90461DC77130F;
+					};
+				};
+			};
+			buildConfigurationList = C271C52B988B19B2669E7141 /* Build configuration list for PBXProject "Pad" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 20483AF36C1E7453A8FCB403;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C1B54B557F3434BE99D6F254 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A3286833D6DD32E08BD1534E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				19593A2206F90461DC77130F /* Pad */,
+				834BFCE6C14AD072CC3B69B0 /* PadTests */,
+				F6608D6CBE0432B58248FB2E /* PadUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4E1006A4F71AFC10D1790774 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9F2D8028F851B85DEF4B513B /* AppIcon.icon in Resources */,
+				AEECD88F21AC692E219E1451 /* AppIconDEV.icon in Resources */,
+				D546D3C0B92484843E80398A /* Assets.xcassets in Resources */,
+				D8853F2F3F9F7611671BAB1D /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		81C4D389AA2F0F3F96EC590A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D52ADB49D8B0EF9B37F57D43 /* AppDelegate.swift in Sources */,
+				0CAAEF1C3A635923D1279E8C /* AppSettings.swift in Sources */,
+				A773212ECD37748C92EC805B /* Commands.swift in Sources */,
+				BEB7038FF6BEAE822F7FDD53 /* DevelopmentBadge.swift in Sources */,
+				72F23CF65A1E51473CA9B6F3 /* LoginItemSettings.swift in Sources */,
+				56B2968316BB77C15DB0AC99 /* OverlaySearchField.swift in Sources */,
+				9AF5F3D82CC644C13E8468A9 /* PadApp.swift in Sources */,
+				D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */,
+				08C4CCDBFAEBCEA878B7136A /* PadFilename.swift in Sources */,
+				6B6D46D5A693330673E58DE1 /* PadNamingSettings.swift in Sources */,
+				27853BDC976688B83D91EB55 /* PadPanel.swift in Sources */,
+				F7515E64199E441474ECBFC3 /* SettingsView.swift in Sources */,
+				1A4EBF4B1DBF34CEADA7E2B8 /* Shortcuts.swift in Sources */,
+				E84E2DEC4BABDF3C1D25B4B7 /* WindowReader.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		96618ACD72C7F72D1765C4D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				269569C2B306932754F49196 /* DocumentTests.swift in Sources */,
+				4AA5982F109490D3B74FBED0 /* FilenameInputTests.swift in Sources */,
+				88BD1FD4C14239700DDF38BF /* FilenameTests.swift in Sources */,
+				52C93C566913D64AD4B6F467 /* OpensWindows.swift in Sources */,
+				4BBBABE5E8263E98D11E059A /* PanelTests.swift in Sources */,
+				42356443B8A156132E766111 /* SettingsTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A389263C346BABD4621DCDF1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		968BD580BEF6DD5120C2577C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 19593A2206F90461DC77130F /* Pad */;
+			targetProxy = A08825A5F349CEF9F9FBDF51 /* PBXContainerItemProxy */;
+		};
+		CFE9B9DD3085F776E9366E56 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 19593A2206F90461DC77130F /* Pad */;
+			targetProxy = BEF99762AD018DF50CA8C625 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2E1B4B629D459D67E5416421 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER).uitests";
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = Pad;
+			};
+			name = Debug;
+		};
+		3A22E3BE8473A5C0759540C3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER).tests";
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(PAD_DISPLAY_NAME).app/Contents/MacOS/$(PAD_DISPLAY_NAME)";
+			};
+			name = Release;
+		};
+		44CE8ECF8ECDA6E69A697C9A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDEV;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Pad.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = Pad;
+				PRODUCT_NAME = "$(PAD_DISPLAY_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		99C8F6671E3994E3928729BB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER).uitests";
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = Pad;
+			};
+			name = Release;
+		};
+		AEAE7819B629352447A733CA /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0AC85B4C5EF3BDE2FF730BC8 /* Signing.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PAD_APP_IDENTIFIER = me.cyzr.pad;
+				PAD_DISPLAY_NAME = Pad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		B8F3D6CA822BAA86CD5EFA47 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0AC85B4C5EF3BDE2FF730BC8 /* Signing.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PAD_APP_IDENTIFIER = me.cyzr.pad.dev;
+				PAD_DISPLAY_NAME = "Pad Dev";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		D37A7B4C5B1547CCF1FE7579 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Pad.entitlements;
+				CODE_SIGN_STYLE = "$(PAD_DISTRIBUTION_SIGNING_STYLE)";
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = Pad;
+				PRODUCT_NAME = "$(PAD_DISPLAY_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "$(PAD_DISTRIBUTION_PROFILE)";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		EEB048E5EA50464666D28179 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER).tests";
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(PAD_DISPLAY_NAME).app/Contents/MacOS/$(PAD_DISPLAY_NAME)";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		22FF90D9A18493BF50FF7AC4 /* Build configuration list for PBXNativeTarget "PadTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EEB048E5EA50464666D28179 /* Debug */,
+				3A22E3BE8473A5C0759540C3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		84747F92E2A5C00F0BC13D4C /* Build configuration list for PBXNativeTarget "PadUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2E1B4B629D459D67E5416421 /* Debug */,
+				99C8F6671E3994E3928729BB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C271C52B988B19B2669E7141 /* Build configuration list for PBXProject "Pad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B8F3D6CA822BAA86CD5EFA47 /* Debug */,
+				AEAE7819B629352447A733CA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F7DFCCB8848678BA99DA3D82 /* Build configuration list for PBXNativeTarget "Pad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				44CE8ECF8ECDA6E69A697C9A /* Debug */,
+				D37A7B4C5B1547CCF1FE7579 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C1B54B557F3434BE99D6F254 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
+			requirement = {
+				kind = exactVersion;
+				version = 3.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1C342CF42DD9556B1B21F222 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C1B54B557F3434BE99D6F254 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 7141872703165A7B95D038A4 /* Project object */;
+}
