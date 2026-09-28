@@ -79,6 +79,9 @@ targets:
       configs:
         Debug:
           ASSETCATALOG_COMPILER_APPICON_NAME: AppIconDEV
+        Release:
+          CODE_SIGN_STYLE: $(PAD_DISTRIBUTION_SIGNING_STYLE)
+          PROVISIONING_PROFILE_SPECIFIER: $(PAD_DISTRIBUTION_PROFILE)
   PadTests:
     type: bundle.unit-test
     platform: macOS

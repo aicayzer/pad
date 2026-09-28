@@ -231,7 +231,6 @@
 				TargetAttributes = {
 					19593A2206F90461DC77130F = {
 						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
 					};
 					834BFCE6C14AD072CC3B69B0 = {
 						DevelopmentTeam = "";
@@ -504,6 +503,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = App/Pad.entitlements;
+				CODE_SIGN_STYLE = "$(PAD_DISTRIBUTION_SIGNING_STYLE)";
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -513,6 +513,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = Pad;
 				PRODUCT_NAME = "$(PAD_DISPLAY_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "$(PAD_DISTRIBUTION_PROFILE)";
 				SDKROOT = macosx;
 			};
 			name = Release;
