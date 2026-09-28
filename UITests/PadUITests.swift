@@ -211,8 +211,10 @@ final class PadUITests: XCTestCase {
         selectTab("General", in: settings)
         let dock = settings.switches["showInDock"]
         XCTAssertTrue(dock.waitForExistence(timeout: 5), settings.debugDescription)
-        let process = try XCTUnwrap(NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleIdentifier).first)
-        XCTAssertEqual(process.activationPolicy, .regular)
+        let matchingProcesses = NSWorkspace.shared.runningApplications.filter { $0.localizedName == app.label }
+        XCTAssertEqual(matchingProcesses.count, 1)
+        let process = try XCTUnwrap(matchingProcesses.first)
+        XCTAssertEqual(process.activationPolicy, NSApplication.ActivationPolicy.regular)
         dock.click()
         let accessory = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.accessory.rawValue),
