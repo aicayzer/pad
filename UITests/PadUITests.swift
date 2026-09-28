@@ -72,6 +72,17 @@ final class PadUITests: XCTestCase {
         let app = launchPad()
         defer { app.terminate() }
         XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
+        selectTab("Shortcuts", in: settings)
+        expectValue("⌃⌥⇧⌘P", in: settings.searchFields.firstMatch)
+        attach(settings.screenshot(), name: "Effective development shortcut")
+        let shortcutDescription = XCTAttachment(string: settings.debugDescription)
+        shortcutDescription.name = "Effective shortcut accessibility state"
+        shortcutDescription.lifetime = .keepAlways
+        add(shortcutDescription)
+        settings.buttons["_XCUI:CloseWindow"].click()
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
         finder.activate()
         XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
@@ -79,14 +90,61 @@ final class PadUITests: XCTestCase {
         let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false OR hittable == false"), object: close)
         XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed)
 
-        finder.typeKey("p", modifierFlags: [.control, .option, .command, .shift])
+        // Finder can have no window; use its on-screen menu bar as the event target.
+        let finderMenuBar = finder.menuBars.firstMatch
+        XCTAssertTrue(finderMenuBar.waitForExistence(timeout: 5), finder.debugDescription)
+        XCTAssertGreaterThan(finderMenuBar.frame.width, 0)
+        finderMenuBar.typeKey("p", modifierFlags: [.control, .option, .command, .shift])
         let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"), object: close)
         XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 5), .completed, app.debugDescription)
         attach(app.screenshot(), name: "Pad opened with development global shortcut")
-        close.click()
+        finderMenuBar.typeKey("p", modifierFlags: [.control, .option, .command, .shift])
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false OR hittable == false"), object: close)
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
         XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
+    }
+
+    func testCancelingNativeFilePanelsAndSharingPreservesScratch() {
+        let app = launchPad()
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        var expected = "Disposable dialog test \(UUID().uuidString)"
+        app.typeText(expected)
+        expectValue(expected, in: editor)
+
+        app.typeKey("s", modifierFlags: [.command, .shift])
+        let saveCancel = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(saveCancel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(saveCancel.isHittable, app.debugDescription)
+        saveCancel.click()
+        expectValue(expected, in: editor)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText("\nAfter canceled Save As.")
+        expected += "\nAfter canceled Save As."
+        expectValue(expected, in: editor)
+
+        app.typeKey("o", modifierFlags: .command)
+        let openCancel = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(openCancel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(openCancel.isHittable, app.debugDescription)
+        openCancel.click()
+        expectValue(expected, in: editor)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText("\nAfter canceled Open.")
+        expected += "\nAfter canceled Open."
+        expectValue(expected, in: editor)
+
+        app.buttons["Share"].firstMatch.click()
+        attach(app.screenshot(), name: "Native sharing picker")
+        app.typeKey(.escape, modifierFlags: [])
+        // If Share did not open its picker, Escape would dismiss the editor instead.
+        expectValue(expected, in: editor)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText("\nAfter canceled Share.")
+        expected += "\nAfter canceled Share."
+        expectValue(expected, in: editor)
+        attach(app.screenshot(), name: "Scratch preserved after native dialogs and sharing")
     }
 
     private func launchPad() -> XCUIApplication {
@@ -95,7 +153,7 @@ final class PadUITests: XCTestCase {
         // NSArgumentDomain overrides leave saved preferences and existing documents untouched.
         app.launchArguments = ["-pad.saveAutomatically", "NO", "-pad.floating", "NO",
                                "-showInDock", "YES", "-menuBarItem", "NO",
-                               "-KeyboardShortcuts_pad", #"{"carbonKeyCode":35,"carbonModifiers":6912}"#]
+                               "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#]
         app.launch()
         return app
     }
