@@ -68,6 +68,7 @@ struct SettingsView: View {
                 if login.status == .requiresApproval { Button("Allow in Login Items…") { login.openSystemSettings() } }
                 if let error = login.error { Text(error).foregroundStyle(.red) }
                 Toggle("Show in Dock", isOn: $settings.showInDock)
+                    .accessibilityIdentifier("showInDock")
                     .disabled(settings.showInDock && !settings.menuBarItem && shortcut == nil)
                 Toggle("Show in menu bar", isOn: $settings.menuBarItem)
                     .disabled(settings.menuBarItem && !settings.showInDock && shortcut == nil)
