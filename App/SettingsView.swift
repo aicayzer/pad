@@ -71,18 +71,12 @@ struct SettingsView: View {
                     .disabled(settings.showInDock && !settings.menuBarItem && shortcut == nil)
                 Toggle("Show in menu bar", isOn: $settings.menuBarItem)
                     .disabled(settings.menuBarItem && !settings.showInDock && shortcut == nil)
-                Picker("Menu bar icon", selection: $settings.menuBarIcon) {
-                    ForEach(MenuBarIcon.allCases) { icon in
-                        HStack { icon.image; Text(icon.title) }.tag(icon)
-                    }
-                }.disabled(!settings.menuBarItem)
-            } footer: {
+            } header: { Text("App") } footer: {
                 if settings.policyPending { Text("Dock change applies when you leave Pad.") }
                 if !settings.showInDock && !settings.menuBarItem, let shortcut {
                     Text("Open Pad with \(shortcut.description).")
                 }
             }
-            Section("Window") { Toggle("Always on top", isOn: $document.floating) }
             Section("Appearance") {
                 Picker("Accent", selection: $settings.accent) {
                     ForEach(AccentChoice.allCases) { Text($0.title).tag($0) }
@@ -90,13 +84,39 @@ struct SettingsView: View {
                 if settings.accent == .custom {
                     ColorPicker("Accent color", selection: Binding(get: { settings.accentColor }, set: { settings.setCustomAccent($0) }), supportsOpacity: false)
                 }
+                LabeledContent("Menu bar icon") {
+                    Menu {
+                        ForEach(MenuBarIcon.allCases) { icon in
+                            Button { settings.menuBarIcon = icon } label: {
+                                icon.image.accessibilityLabel(icon.title)
+                            }
+                        }
+                    } label: {
+                        settings.menuBarIcon.image
+                    }
+                    .menuStyle(.button)
+                    .menuIndicator(.visible)
+                    .buttonStyle(.borderless)
+                    .tint(.primary)
+                    .fixedSize()
+                    .accessibilityLabel("Menu bar icon")
+                    .accessibilityValue(settings.menuBarIcon.title)
+                }
+                .disabled(!settings.menuBarItem)
+                Toggle("Always on top", isOn: $document.floating)
             }
-            Section {
+            Section("About") {
                 LabeledContent("Version", value: "\(Bundle.main.shortVersion) (\(Bundle.main.buildNumber))")
-                Link("Source Code", destination: URL(string: "https://github.com/aicayzer/pad")!)
-                Link("Releases", destination: URL(string: "https://github.com/aicayzer/pad/releases")!)
-                Link("License", destination: URL(string: "https://github.com/aicayzer/pad/blob/main/LICENSE")!)
-            } footer: { Text("Updates are managed by the App Store.") }
+                Link(destination: URL(string: "https://github.com/aicayzer/pad")!) {
+                    Text("Source Code").foregroundStyle(settings.accentColor)
+                }
+                Link(destination: URL(string: "https://github.com/aicayzer/pad/releases")!) {
+                    Text("Releases").foregroundStyle(settings.accentColor)
+                }
+                Link(destination: URL(string: "https://github.com/aicayzer/pad/blob/main/LICENSE")!) {
+                    Text("License").foregroundStyle(settings.accentColor)
+                }
+            }
         }.formStyle(.grouped)
     }
 
@@ -125,9 +145,17 @@ struct SettingsView: View {
             }
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Default filename")
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text("Default filename").fixedSize()
+                        Spacer(minLength: 0)
+                        Text("Example: \(document.namePreview)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(document.namePreview)
+                    }
                     PadNameField(parts: $document.nameParts).frame(height: 26)
-                    Text("Example: \(document.namePreview)").font(.caption).foregroundStyle(.secondary)
                 }
             } header: { Text("Naming") } footer: {
                 Text("Add date or number variables with +. Rename an individual file in its title.")
@@ -150,12 +178,10 @@ struct SettingsView: View {
                     // Keep an entry point when the final global shortcut is removed.
                     if value == nil && !settings.showInDock && !settings.menuBarItem { settings.menuBarItem = true }
                 }
+                .shortcutValidation { document.editingShortcuts.validateGlobal($0) }
             }
             Section("While Editing") {
-                LabeledContent("New Text File", value: "⌘N")
-                LabeledContent("Open File", value: "⌘O")
-                LabeledContent("Save", value: "⌘S")
-                LabeledContent("Save As", value: "⇧⌘S")
+                EditingShortcutSettings(shortcuts: document.editingShortcuts)
             }
         }.formStyle(.grouped)
     }
