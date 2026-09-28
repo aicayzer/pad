@@ -36,7 +36,10 @@ final class AppSettings {
     func applyActivationPolicy() {
         let policy: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { activationPolicyError = nil; return }
+        let wasActive = NSApp.isActive
         let applied = NSApp.setActivationPolicy(policy)
+        // Changing policy schedules an activation yield; cancel it while Settings still has focus.
+        if applied && wasActive { NSApp.activate() }
         activationPolicyError = applied || NSApp.activationPolicy() == policy
             ? nil : "Could not update Dock visibility. Try changing the setting again."
     }
