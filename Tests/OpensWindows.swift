@@ -1,0 +1,13 @@
+import Foundation
+import Testing
+
+extension Trait where Self == ConditionTrait {
+    /// A window a test opens appears on the screen of whoever runs the tests, so a suite that opens one runs only
+    /// where the environment asks for it, as CI does.
+    static var opensWindows: Self {
+        .enabled(
+            if: ProcessInfo.processInfo.environment["PAD_WINDOW_TESTS"] == "1",
+            "set PAD_WINDOW_TESTS to run a suite that opens a window"
+        )
+    }
+}

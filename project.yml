@@ -1,0 +1,110 @@
+name: Pad
+options:
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+  defaultConfig: Debug
+  groupSortPosition: top
+configs:
+  Debug: debug
+  Release: release
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    exactVersion: "3.1.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "27.0"
+    ENABLE_DEBUG_DYLIB: NO
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: 1
+    VERSIONING_SYSTEM: apple-generic
+    PAD_APP_IDENTIFIER: me.cyzr.pad
+    PAD_DISPLAY_NAME: Pad
+  configs:
+    Debug:
+      PAD_APP_IDENTIFIER: me.cyzr.pad.dev
+      PAD_DISPLAY_NAME: Pad Dev
+targets:
+  Pad:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - "**/.DS_Store"
+          - Resources/MenuBarIcon.png
+          - Resources/pad-squiggle.png
+    dependencies:
+      - package: KeyboardShortcuts
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: $(PAD_DISPLAY_NAME)
+        CFBundleName: $(PAD_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHighResolutionCapable: true
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Text Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.plain-text, net.daringfireball.markdown]
+            CFBundleTypeExtensions: [txt, md]
+    entitlements:
+      path: App/Pad.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.downloads.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+    settings:
+      base:
+        PRODUCT_NAME: $(PAD_DISPLAY_NAME)
+        PRODUCT_MODULE_NAME: Pad
+        PRODUCT_BUNDLE_IDENTIFIER: $(PAD_APP_IDENTIFIER)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        Debug:
+          ASSETCATALOG_COMPILER_APPICON_NAME: AppIconDEV
+  PadTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Pad
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PAD_APP_IDENTIFIER).tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/$(PAD_DISPLAY_NAME).app/Contents/MacOS/$(PAD_DISPLAY_NAME)
+        BUNDLE_LOADER: $(TEST_HOST)
+        ENABLE_HARDENED_RUNTIME: NO
+schemes:
+  Pad:
+    build:
+      targets:
+        Pad: all
+        PadTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - name: PadTests
+          parallelizable: false
+    archive:
+      config: Release
