@@ -11,6 +11,7 @@ struct EditingShortcutSettings: View {
                 set: { shortcuts.set($0, for: action) }
             ))
             .shortcutValidation { shortcuts.validate($0, for: action) }
+            .accessibilityIdentifier("editingShortcut.\(action.rawValue)")
         }
         Button("Restore Defaults") { shortcuts.restoreDefaults() }
             .disabled(shortcuts.isDefault)

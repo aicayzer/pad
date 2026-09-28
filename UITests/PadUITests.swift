@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -157,12 +158,94 @@ final class PadUITests: XCTestCase {
         attach(app.screenshot(), name: "Scratch preserved after native dialogs and sharing")
     }
 
+    func testCustomEditingShortcutAndRestoreDefaults() {
+        let app = launchPad()
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        app.typeText("Disposable shortcut draft")
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectTab("Shortcuts", in: settings)
+        let recorder = settings.searchFields["editingShortcut.newFile"]
+        XCTAssertTrue(recorder.waitForExistence(timeout: 5), settings.debugDescription)
+        expectValue("⌘N", in: recorder)
+        recorder.click()
+        app.typeKey("b", modifierFlags: [.command, .shift])
+        expectValue("⇧⌘B", in: recorder)
+        attach(settings.screenshot(), name: "Custom local editing shortcut")
+        settings.buttons["_XCUI:CloseWindow"].click()
+        editor.click()
+        app.typeKey("n", modifierFlags: .command)
+        expectValue("Disposable shortcut draft", in: editor)
+        app.typeKey("b", modifierFlags: [.command, .shift])
+        expectValue("", in: editor)
+        app.typeText("Draft after custom shortcut")
+        expectValue("Draft after custom shortcut", in: editor)
+
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectTab("Shortcuts", in: settings)
+        settings.buttons["Restore Defaults"].click()
+        expectValue("⌘N", in: recorder)
+        settings.buttons["_XCUI:CloseWindow"].click()
+        editor.click()
+        app.typeKey("b", modifierFlags: [.command, .shift])
+        expectValue("Draft after custom shortcut", in: editor)
+        app.typeKey("n", modifierFlags: .command)
+        expectValue("", in: editor)
+        attach(app.screenshot(), name: "Restored New Text File shortcut")
+    }
+
+    func testDockToggleKeepsSettingsAndDraftUsable() throws {
+        let app = launchPad()
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        let draft = "Disposable Dock visibility draft"
+        app.typeText(draft)
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectTab("General", in: settings)
+        let dock = settings.switches["showInDock"]
+        XCTAssertTrue(dock.waitForExistence(timeout: 5), settings.debugDescription)
+        let process = try XCTUnwrap(NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleIdentifier).first)
+        XCTAssertEqual(process.activationPolicy, .regular)
+        dock.click()
+        let accessory = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.accessory.rawValue),
+            object: process)
+        XCTAssertEqual(XCTWaiter.wait(for: [accessory], timeout: 5), .completed)
+        selectTab("Files", in: settings)
+        XCTAssertTrue(settings.staticTexts["Save when Pad closes"].firstMatch.waitForExistence(timeout: 5))
+        expectValue(draft, in: editor)
+        selectTab("General", in: settings)
+        attach(settings.screenshot(), name: "Settings remains usable without Dock icon")
+        dock.click()
+        let regular = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.regular.rawValue),
+            object: process)
+        XCTAssertEqual(XCTWaiter.wait(for: [regular], timeout: 5), .completed)
+        selectTab("Shortcuts", in: settings)
+        XCTAssertTrue(settings.staticTexts["Show or hide Pad"].firstMatch.waitForExistence(timeout: 5))
+        settings.buttons["_XCUI:CloseWindow"].click()
+        editor.click()
+        expectValue(draft, in: editor)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText(" still editing")
+        expectValue(draft + " still editing", in: editor)
+        attach(app.screenshot(), name: "Draft preserved through Dock visibility changes")
+    }
+
     private func launchPad() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        // NSArgumentDomain overrides leave saved preferences and existing documents untouched.
+        // Launch overrides establish a deterministic initial state without changing saved values.
         app.launchArguments = ["-pad.saveAutomatically", "NO", "-pad.floating", "NO",
                                "-showInDock", "YES", "-menuBarItem", "NO",
+                               "-pad.editingShortcuts", "invalid",
                                "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#]
         app.launch()
         return app
