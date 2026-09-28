@@ -63,15 +63,48 @@ xcodegen generate > "$output/generation.log" 2>&1 || {
   exit 1
 }
 
-# Package resource bundles need the team and certificate too; only the app target receives a profile.
-if ! xcodebuild -quiet -project Pad.xcodeproj -scheme Pad -configuration Release \
+# Keep operational files private, but installed app resources must be readable by every user.
+# The parent opens each log with its private umask before starting the build subshell.
+if ! (
+  umask 022
+  # Package resource bundles need the team and certificate too; only the app target receives a profile.
+  xcodebuild -quiet -project Pad.xcodeproj -scheme Pad -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$output/Pad.xcarchive" \
   -derivedDataPath "$output/DerivedData" CURRENT_PROJECT_VERSION="$build_number" \
   CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$team" CODE_SIGN_IDENTITY="$identity" \
-  "${keychain_flags[@]}" archive > "$output/archive.log" 2>&1; then
+  "${keychain_flags[@]}" archive
+) > "$output/archive.log" 2>&1; then
   print -u2 "Archive failed; inspect $output/archive.log privately."
   exit 1
 fi
+# A root-owned package can pass codesign yet fail App Store validation if resources are owner-only.
+python3 - "$output/Pad.xcarchive" <<'PY_PERMISSIONS'
+from pathlib import Path
+import plistlib
+import stat
+import sys
+
+archive = Path(sys.argv[1])
+with (archive / "Info.plist").open("rb") as file:
+    properties = plistlib.load(file)["ApplicationProperties"]
+app = archive / "Products" / properties["ApplicationPath"]
+if not app.is_dir():
+    raise SystemExit("Archived application is missing; refusing export.")
+invalid = []
+for path in [app, *app.rglob("*")]:
+    if path.is_symlink():
+        continue
+    mode = stat.S_IMODE(path.stat().st_mode)
+    required = stat.S_IROTH
+    if path.is_dir() or mode & 0o111:
+        required |= stat.S_IXOTH
+    if mode & required != required:
+        invalid.append(f"{path.relative_to(app)} ({mode:04o})")
+if invalid:
+    print("Archived app contains files inaccessible to installed users:", file=sys.stderr)
+    print("\n".join(invalid), file=sys.stderr)
+    raise SystemExit(1)
+PY_PERMISSIONS
 bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$output/Pad.xcarchive/Info.plist")
 python3 - "$output/ExportOptions.plist" "$team" "$profile" "$identity" "$installer_identity" "$bundle_id" <<'PY'
 import plistlib, sys
@@ -88,9 +121,11 @@ with open(path, 'wb') as file:
         'manageAppVersionAndBuildNumber': False,
     }, file)
 PY
-if ! xcodebuild -quiet -exportArchive -archivePath "$output/Pad.xcarchive" \
-  -exportPath "$output/Export" -exportOptionsPlist "$output/ExportOptions.plist" \
-  > "$output/export.log" 2>&1; then
+if ! (
+  umask 022
+  xcodebuild -quiet -exportArchive -archivePath "$output/Pad.xcarchive" \
+  -exportPath "$output/Export" -exportOptionsPlist "$output/ExportOptions.plist"
+) > "$output/export.log" 2>&1; then
   print -u2 "Export failed; inspect $output/export.log privately."
   exit 1
 fi
