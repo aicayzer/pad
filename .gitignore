@@ -1,0 +1,14 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+Config/Local.xcconfig
+Config/Local.xcconfig.*
+Config/Cloud.xcconfig
+*.xcarchive
+*.xcresult
+*.pkg
+*.p12
+*.mobileprovision
+*.provisionprofile
