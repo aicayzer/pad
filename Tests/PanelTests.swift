@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 import Testing
 @testable import Pad
@@ -65,7 +66,7 @@ struct PanelTests {
         document.showSettings = {
             settingsWindow.makeKeyAndOrderFront(nil)
         }
-        #expect(try command(",", in: panel))
+        #expect(try command(.comma, character: ",", in: panel))
         try await eventually("settings focus and guard", diagnostics: { trace.events.joined(separator: "\n") }) {
             settingsWindow.isKeyWindow && document.settingsPresented
         }
@@ -104,7 +105,7 @@ struct PanelTests {
         }
 
         let savedURL = try #require(document.url)
-        #expect(try command("n", in: panel))
+        #expect(try command(.n, character: "n", in: panel))
         #expect(document.documentID != originalID)
         #expect(document.text.isEmpty)
         #expect(document.url == nil)
@@ -121,11 +122,11 @@ struct PanelTests {
         #expect(document.text == "Reuse this scratch file.")
     }
 
-    private func command(_ character: String, in panel: PadPanel) throws -> Bool {
+    private func command(_ key: KeyboardShortcuts.Key, character: String, in panel: PadPanel) throws -> Bool {
         let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
                                                 timestamp: 0, windowNumber: panel.windowNumber, context: nil,
                                                 characters: character, charactersIgnoringModifiers: character,
-                                                isARepeat: false, keyCode: 0))
+                                                isARepeat: false, keyCode: UInt16(key.rawValue)))
         return panel.performKeyEquivalent(with: event)
     }
 

@@ -88,21 +88,17 @@ final class PadPanel: NSPanel {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if event.charactersIgnoringModifiers == "n", modifiers == .command {
-            files.commandNew()
-            return true
-        }
-        if event.charactersIgnoringModifiers == "s", modifiers == .command {
-            files.save()
-            return true
-        }
-        if event.charactersIgnoringModifiers == "s", modifiers == [.command, .shift] {
-            Task { await files.saveAs() }
+        if let action = files.editingShortcuts.action(for: event) {
+            switch action {
+            case .newFile: files.commandNew()
+            case .open: Task { await files.openPicker() }
+            case .save: files.save()
+            case .saveAs: Task { await files.saveAs() }
+            }
             return true
         }
         if modifiers == .command {
             switch event.charactersIgnoringModifiers {
-            case "o": Task { await files.openPicker() }
             case "w": files.close()
             case ",":
                 files.settingsPresented = true

@@ -11,7 +11,7 @@ final class AppSettings {
     var menuBarIcon: MenuBarIcon { didSet { defaults.set(menuBarIcon.rawValue, forKey: "menuBarIcon") } }
     var accent: AccentChoice { didSet { defaults.set(accent.rawValue, forKey: "accent") } }
     var customAccent: String { didSet { defaults.set(customAccent, forKey: "customAccent") } }
-    private(set) var policyPending = false
+    private(set) var activationPolicyError: String?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -35,11 +35,13 @@ final class AppSettings {
 
     func applyActivationPolicy() {
         let policy: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
-        guard NSApp.activationPolicy() != policy else { policyPending = false; return }
-        // Changing policy while active can steal focus from the settings being edited.
-        guard !NSApp.isActive else { policyPending = true; return }
-        NSApp.setActivationPolicy(policy)
-        policyPending = false
+        guard NSApp.activationPolicy() != policy else { activationPolicyError = nil; return }
+        let wasActive = NSApp.isActive
+        let applied = NSApp.setActivationPolicy(policy)
+        // Changing policy schedules an activation yield; cancel it while Settings still has focus.
+        if applied && wasActive { NSApp.activate() }
+        activationPolicyError = applied || NSApp.activationPolicy() == policy
+            ? nil : "Could not update Dock visibility. Try changing the setting again."
     }
 }
 
