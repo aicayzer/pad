@@ -52,6 +52,7 @@ enum PadError: LocalizedError {
 @MainActor
 @Observable
 final class PadDocument {
+    let editingShortcuts: EditingShortcuts
     var floating: Bool {
         didSet {
             defaults.set(floating, forKey: Self.floatingKey)
@@ -148,6 +149,7 @@ final class PadDocument {
          discardChanges: (@MainActor () -> Bool)? = nil) {
         self.noticeDuration = noticeDuration
         self.defaults = defaults
+        editingShortcuts = EditingShortcuts(defaults: defaults)
         self.presentsWindow = presentsWindow
         self.copyPath = copyPath
         self.selectOpenFile = selectOpenFile ?? Self.presentOpenPanel
