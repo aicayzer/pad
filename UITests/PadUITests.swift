@@ -29,6 +29,7 @@ final class PadUITests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows["com_apple_SwiftUI_Settings_window"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
+        selectTab("General", in: settings)
         let login = settings.staticTexts["Open at login"].firstMatch
         XCTAssertTrue(login.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(login.isHittable, app.debugDescription)
@@ -114,7 +115,7 @@ final class PadUITests: XCTestCase {
         expectValue(expected, in: editor)
 
         app.typeKey("s", modifierFlags: [.command, .shift])
-        let saveCancel = app.buttons["Cancel"].firstMatch
+        let saveCancel = app.buttons["CancelButton"].firstMatch
         XCTAssertTrue(saveCancel.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(saveCancel.isHittable, app.debugDescription)
         saveCancel.click()
@@ -125,7 +126,7 @@ final class PadUITests: XCTestCase {
         expectValue(expected, in: editor)
 
         app.typeKey("o", modifierFlags: .command)
-        let openCancel = app.buttons["Cancel"].firstMatch
+        let openCancel = app.buttons["CancelButton"].firstMatch
         XCTAssertTrue(openCancel.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(openCancel.isHittable, app.debugDescription)
         openCancel.click()
@@ -136,9 +137,25 @@ final class PadUITests: XCTestCase {
         expectValue(expected, in: editor)
 
         app.buttons["Share"].firstMatch.click()
-        attach(app.screenshot(), name: "Native sharing picker")
+        // ShareKit can expose its remote picker under either accessibility host.
+        let shareHost = XCUIApplication(bundleIdentifier: "com.apple.sharing.ShareSheetUI")
+        let appDestination = app.descendants(matching: .any)["AirDrop"].firstMatch
+        let remoteDestination = shareHost.descendants(matching: .any)["AirDrop"].firstMatch
+        let destination = appDestination.waitForExistence(timeout: 5) ? appDestination : remoteDestination
+        let visible = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: destination)
+        let result = XCTWaiter.wait(for: [visible], timeout: 10)
+        let remoteState = shareHost.state == .notRunning ? "Not running" : shareHost.debugDescription
+        let sharingState = XCTAttachment(string: app.debugDescription + "\nShareKit:\n" + remoteState)
+        sharingState.name = "Native sharing picker accessibility state"
+        sharingState.lifetime = .keepAlways
+        add(sharingState)
+        XCTAssertEqual(result, .completed, "The native share destination must be visible before dismissal.")
+        attach(XCUIScreen.main.screenshot(), name: "Native sharing picker")
         app.typeKey(.escape, modifierFlags: [])
-        // If Share did not open its picker, Escape would dismiss the editor instead.
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false OR hittable == false"), object: destination)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
         expectValue(expected, in: editor)
         app.typeKey(.downArrow, modifierFlags: .command)
         app.typeText("\nAfter canceled Share.")
