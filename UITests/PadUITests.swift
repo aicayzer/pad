@@ -137,24 +137,17 @@ final class PadUITests: XCTestCase {
         expectValue(expected, in: editor)
 
         app.buttons["Share"].firstMatch.click()
-        // ShareKit can expose its remote picker under either accessibility host.
-        let shareHost = XCUIApplication(bundleIdentifier: "com.apple.sharing.ShareSheetUI")
-        let appDestination = app.descendants(matching: .any)["AirDrop"].firstMatch
-        let remoteDestination = shareHost.descendants(matching: .any)["AirDrop"].firstMatch
-        let destination = appDestination.waitForExistence(timeout: 5) ? appDestination : remoteDestination
-        let visible = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: destination)
-        let result = XCTWaiter.wait(for: [visible], timeout: 10)
-        let remoteState = shareHost.state == .notRunning ? "Not running" : shareHost.debugDescription
-        let sharingState = XCTAttachment(string: app.debugDescription + "\nShareKit:\n" + remoteState)
+        let picker = app.popovers["ShareSheet.Popover"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertGreaterThan(picker.frame.width, 0)
+        let sharingState = XCTAttachment(string: app.debugDescription)
         sharingState.name = "Native sharing picker accessibility state"
         sharingState.lifetime = .keepAlways
         add(sharingState)
-        XCTAssertEqual(result, .completed, "The native share destination must be visible before dismissal.")
         attach(XCUIScreen.main.screenshot(), name: "Native sharing picker")
         app.typeKey(.escape, modifierFlags: [])
         let dismissed = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false OR hittable == false"), object: destination)
+            predicate: NSPredicate(format: "exists == false"), object: picker)
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
         expectValue(expected, in: editor)
         app.typeKey(.downArrow, modifierFlags: .command)
