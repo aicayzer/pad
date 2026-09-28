@@ -48,6 +48,31 @@ import Testing
         #expect(files.error == PadError.invalidName.localizedDescription)
     }
 
+    @Test func commandLineBooleanOverridesDoNotPersistPreferences() throws {
+        let suite = "pad-argument-tests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let previous = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        defer {
+            defaults.setVolatileDomain(previous, forName: UserDefaults.argumentDomain)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        for (argument, expected) in [("NO", false), ("YES", true)] {
+            defaults.setVolatileDomain([
+                "pad.saveAutomatically": argument,
+                "pad.floating": argument,
+                "showInDock": argument,
+                "menuBarItem": argument
+            ], forName: UserDefaults.argumentDomain)
+            let document = PadDocument(defaults: defaults, presentsWindow: false)
+            let settings = AppSettings(defaults: defaults)
+            #expect(document.saveAutomatically == expected)
+            #expect(document.floating == expected)
+            #expect(settings.showInDock == expected)
+            #expect(settings.menuBarItem == expected)
+            #expect(defaults.persistentDomain(forName: suite)?.isEmpty != false)
+        }
+    }
+
     @Test func defaultsAndPreferencesPersist() throws {
         let (files, root, defaults, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }

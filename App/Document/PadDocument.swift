@@ -158,9 +158,9 @@ final class PadDocument {
         #else
         let defaultFloating = true
         #endif
-        floating = defaults.object(forKey: Self.floatingKey) as? Bool ?? defaultFloating
+        floating = defaults.object(forKey: Self.floatingKey) == nil ? defaultFloating : defaults.bool(forKey: Self.floatingKey)
         format = defaults.string(forKey: Self.formatKey).flatMap(PadFormat.init(rawValue:)) ?? .txt
-        saveAutomatically = defaults.object(forKey: Self.autoSaveKey) as? Bool ?? true
+        saveAutomatically = defaults.object(forKey: Self.autoSaveKey) == nil ? true : defaults.bool(forKey: Self.autoSaveKey)
         reusePeriod = PadReuse(rawValue: defaults.object(forKey: Self.reuseKey) as? Int ?? 15) ?? .fifteenMinutes
         nameParts = defaults.data(forKey: Self.namePartsKey)
             .flatMap { try? JSONDecoder().decode([PadNamePart].self, from: $0) } ?? PadFilename.defaultParts
@@ -618,7 +618,7 @@ final class PadDocument {
         guard presentsWindow else { return }
         if panel == nil { panel = PadPanel(files: self) }
         updateTitle()
-        isActive = true
+        // PadPanel.becomeKey owns activation; focus cannot succeed before the window is key.
         panel?.makeKeyAndOrderFront(nil)
     }
 

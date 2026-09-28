@@ -15,8 +15,8 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        showInDock = defaults.object(forKey: "showInDock") as? Bool ?? true
-        menuBarItem = defaults.object(forKey: "menuBarItem") as? Bool ?? true
+        showInDock = defaults.object(forKey: "showInDock") == nil ? true : defaults.bool(forKey: "showInDock")
+        menuBarItem = defaults.object(forKey: "menuBarItem") == nil ? true : defaults.bool(forKey: "menuBarItem")
         menuBarIcon = MenuBarIcon(rawValue: defaults.string(forKey: "menuBarIcon") ?? "") ?? .mark
         accent = AccentChoice(rawValue: defaults.string(forKey: "accent") ?? "") ?? .standard
         customAccent = defaults.string(forKey: "customAccent") ?? "BEBAFC"

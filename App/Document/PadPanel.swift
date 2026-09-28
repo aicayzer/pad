@@ -26,6 +26,7 @@ final class PadPanel: NSPanel {
     private var previousFrame: NSRect?
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = OverlayInputResponder()
+    private var editorFocusScheduled = false
 
     var pendingEditorEventCount: Int { pendingEditorInput.eventCount }
 
@@ -57,7 +58,32 @@ final class PadPanel: NSPanel {
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
         }))
+        NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
+                                               name: NSApplication.didBecomeActiveNotification, object: nil)
         center()
+    }
+
+    @objc private func applicationBecameActive() { requestEditorFocus() }
+
+    func requestEditorFocus() {
+        guard !editorFocusScheduled else { return }
+        editorFocusScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.editorFocusScheduled = false
+            guard self.isKeyWindow, self.isVisible, !self.files.settingsPresented,
+                  self.firstResponder === self.pendingEditorInput || self.firstResponder === self,
+                  let content = self.contentView, let editor = self.editor(in: content), editor.isEditable else { return }
+            self.makeFirstResponder(editor)
+        }
+    }
+
+    private func editor(in view: NSView) -> NSTextView? {
+        if let editor = view as? NSTextView, !editor.isFieldEditor { return editor }
+        for child in view.subviews {
+            if let editor = editor(in: child) { return editor }
+        }
+        return nil
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -110,6 +136,7 @@ final class PadPanel: NSPanel {
             makeFirstResponder(pendingEditorInput)
         }
         files.isActive = true
+        requestEditorFocus()
     }
 
     override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
@@ -213,6 +240,7 @@ private struct PadView: View {
 
             VStack(spacing: 0) {
                 TextEditor(text: $files.text)
+                    .background(EditorFocusMount())
                     .font(.system(size: 15))
                     .scrollContentBackground(.hidden)
                     .focused($editing)
@@ -279,5 +307,26 @@ private struct PadToolbarButtonStyle: ButtonStyle {
             .background(Color.primary.opacity(primary || hovered || configuration.isPressed ? 0.1 : 0), in: Capsule())
             .contentShape(Capsule())
             .onHover { hovered = $0 }
+    }
+}
+
+// The native editor can mount after SwiftUI's initial focus request has already run.
+private struct EditorFocusMount: NSViewRepresentable {
+    func makeNSView(context: Context) -> MountView { MountView() }
+
+    func updateNSView(_ view: MountView, context: Context) { view.requestFocus() }
+
+    final class MountView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            requestFocus()
+        }
+
+        override func layout() {
+            super.layout()
+            requestFocus()
+        }
+
+        func requestFocus() { (window as? PadPanel)?.requestEditorFocus() }
     }
 }
