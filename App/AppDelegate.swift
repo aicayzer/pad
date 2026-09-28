@@ -40,11 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    func applicationDidResignActive(_ notification: Notification) {
-        guard !Self.isTestHost else { return }
-        settings.applyActivationPolicy()
-    }
-
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         document.canTerminate() ? .terminateNow : .terminateCancel

@@ -72,7 +72,7 @@ struct SettingsView: View {
                 Toggle("Show in menu bar", isOn: $settings.menuBarItem)
                     .disabled(settings.menuBarItem && !settings.showInDock && shortcut == nil)
             } header: { Text("App") } footer: {
-                if settings.policyPending { Text("Dock change applies when you leave Pad.") }
+                if let error = settings.activationPolicyError { Text(error).foregroundStyle(.red) }
                 if !settings.showInDock && !settings.menuBarItem, let shortcut {
                     Text("Open Pad with \(shortcut.description).")
                 }
