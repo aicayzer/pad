@@ -15,6 +15,8 @@ struct PanelTests {
         let document = PadDocument(defaults: defaults, defaultFolder: root,
                                    noticeDuration: .milliseconds(150), copyPath: { _ in })
         let initialWindows = Set(NSApp.windows.map(ObjectIdentifier.init))
+        let trace = PanelActivationTrace()
+        defer { trace.stop() }
         NSApp.activate()
         document.newFile()
         let panel = try #require(NSApp.windows.compactMap { $0 as? PadPanel }.first {
@@ -60,9 +62,13 @@ struct PanelTests {
         document.saveAutomatically = false
         let settings = AppSettings(defaults: defaults)
         settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(settings).environment(document))
-        document.showSettings = { settingsWindow.makeKeyAndOrderFront(nil) }
+        document.showSettings = {
+            settingsWindow.makeKeyAndOrderFront(nil)
+        }
         #expect(try command(",", in: panel))
-        try await eventually("settings focus and guard") { settingsWindow.isKeyWindow && document.settingsPresented }
+        try await eventually("settings focus and guard", diagnostics: { trace.events.joined(separator: "\n") }) {
+            settingsWindow.isKeyWindow && document.settingsPresented
+        }
         #expect(panel.isVisible)
         #expect(document.text == originalText)
         #expect(document.documentID == originalID)
@@ -71,7 +77,8 @@ struct PanelTests {
             try await settle()
             try capture(settingsWindow, name: "settings-\(name)")
         }
-        panel.makeKeyAndOrderFront(nil)
+        // Opening an already-visible Pad must preserve its file even outside the reuse interval.
+        document.showCurrent(now: .now.addingTimeInterval(24 * 60 * 60))
         try await eventually("return from settings") { panel.isKeyWindow && document.isActive && !document.settingsPresented }
         #expect(document.text == originalText)
         #expect(document.documentID == originalID)
@@ -154,5 +161,26 @@ struct PanelTests {
         view.cacheDisplay(in: view.bounds, to: bitmap)
         let data = try #require(bitmap.representation(using: .png, properties: [:]))
         try data.write(to: folder.appending(path: "\(name).png"), options: .atomic)
+    }
+}
+
+@MainActor
+private final class PanelActivationTrace: NSObject {
+    private(set) var events: [String] = []
+
+    override init() {
+        super.init()
+        for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
+                     NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(record(_:)), name: name, object: nil)
+        }
+    }
+
+    func stop() { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func record(_ notification: Notification) {
+        let source = (notification.object as? NSWindow).map { "\(type(of: $0)) #\($0.windowNumber)" } ?? "application"
+        let key = NSApp.keyWindow.map { String($0.windowNumber) } ?? "nil"
+        events.append("\(notification.name.rawValue): \(source), appActive=\(NSApp.isActive), keyWindow=\(key)")
     }
 }

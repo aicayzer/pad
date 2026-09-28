@@ -8,6 +8,8 @@ Use a dedicated development Mac running macOS 27 and Xcode 27 for builds and int
 
 Pull requests use GitHub-hosted `xcode-27` runners, never persistent personal runners. GitHub's [image announcement](https://github.com/actions/runner-images/issues/14404) confirms its macOS 27 base. CI checks generated-project consistency, Debug tests, and a Release build. Window suites use `PAD_WINDOW_TESTS=1`; with xcodebuild, pass `TEST_RUNNER_PAD_WINDOW_TESTS=1`. Leave it unset on an occupied desktop. CI runs `FilenameInputTests` and `PanelTests` in separate, sequential xcodebuild invocations, excluding them from the main run: Swift Testing can otherwise interleave separate serialized suites that compete for the key window. Use the same suite filters for remote interactive verification.
 
+The shared `Pad UI Tests` scheme exercises real keyboard and window interactions in an isolated desktop session. It uses launch-argument preferences to discard disposable scratch text and retains screenshots in the test result. Run it separately from all other GUI tests; it requires macOS UI testing permission. An in-process panel test does not establish that macOS accepted a foreground activation request.
+
 ## First internal TestFlight build
 
 1. Merge a reviewed PR after CI passes. Set the version and initial build number in `project.yml`, regenerate, and commit. Verify the actual files, keyboard shortcuts, focus restoration, settings, sharing, external edits, and development/release isolation on the dedicated Mac.

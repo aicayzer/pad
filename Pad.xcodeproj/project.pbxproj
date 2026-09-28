@@ -26,6 +26,7 @@
 		A773212ECD37748C92EC805B /* Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FEF301DA1CA940EC7E4697 /* Commands.swift */; };
 		AEECD88F21AC692E219E1451 /* AppIconDEV.icon in Resources */ = {isa = PBXBuildFile; fileRef = 621D41FA4140656C065BF7AB /* AppIconDEV.icon */; };
 		BEB7038FF6BEAE822F7FDD53 /* DevelopmentBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */; };
+		C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A999B97A56ADD25994D11B77 /* PadUITests.swift */; };
 		D52ADB49D8B0EF9B37F57D43 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8973E101DCBB6B34544E1C63 /* AppDelegate.swift */; };
 		D546D3C0B92484843E80398A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D843D996E9C2857B0E6072A1 /* Assets.xcassets */; };
 		D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */; };
@@ -35,6 +36,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		A08825A5F349CEF9F9FBDF51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7141872703165A7B95D038A4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 19593A2206F90461DC77130F;
+			remoteInfo = Pad;
+		};
 		BEF99762AD018DF50CA8C625 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 7141872703165A7B95D038A4 /* Project object */;
@@ -46,6 +54,7 @@
 
 /* Begin PBXFileReference section */
 		0AC85B4C5EF3BDE2FF730BC8 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		1F25C3713587E03DED4F2128 /* PadUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PadUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2187E3E013FE86C3489E5628 /* PanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelTests.swift; sourceTree = "<group>"; };
 		22FEF301DA1CA940EC7E4697 /* Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Commands.swift; sourceTree = "<group>"; };
 		28C281F3B441312B4BE4E113 /* Pad.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pad.entitlements; sourceTree = "<group>"; };
@@ -60,6 +69,7 @@
 		8973E101DCBB6B34544E1C63 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		933726A377415C032B720BA9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A2694A6E13E03EDC77FA2FD0 /* FilenameInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameInputTests.swift; sourceTree = "<group>"; };
+		A999B97A56ADD25994D11B77 /* PadUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadUITests.swift; sourceTree = "<group>"; };
 		B89C30E859A54BC39F6D3B16 /* DocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTests.swift; sourceTree = "<group>"; };
 		B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadDocument.swift; sourceTree = "<group>"; };
 		B9385ADB1CD28DEBD5021C16 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -105,6 +115,7 @@
 				F0B718D3EB2216D05207A714 /* App */,
 				6C1A45C45EF0260147361126 /* Config */,
 				BB9985B62F85390D0E9173B1 /* Tests */,
+				A6D7499B2BBCA2AEC185E3F2 /* UITests */,
 				A3286833D6DD32E08BD1534E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -141,8 +152,17 @@
 			children = (
 				DD48B4B123B65A0DFCAD4B8D /* Pad.app */,
 				FD7CF2FD18E4F9D6EC9BA2DB /* PadTests.xctest */,
+				1F25C3713587E03DED4F2128 /* PadUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A6D7499B2BBCA2AEC185E3F2 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				A999B97A56ADD25994D11B77 /* PadUITests.swift */,
+			);
+			path = UITests;
 			sourceTree = "<group>";
 		};
 		BB9985B62F85390D0E9173B1 /* Tests */ = {
@@ -220,6 +240,24 @@
 			productReference = FD7CF2FD18E4F9D6EC9BA2DB /* PadTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		F6608D6CBE0432B58248FB2E /* PadUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 84747F92E2A5C00F0BC13D4C /* Build configuration list for PBXNativeTarget "PadUITests" */;
+			buildPhases = (
+				A389263C346BABD4621DCDF1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				968BD580BEF6DD5120C2577C /* PBXTargetDependency */,
+			);
+			name = PadUITests;
+			packageProductDependencies = (
+			);
+			productName = PadUITests;
+			productReference = 1F25C3713587E03DED4F2128 /* PadUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -235,6 +273,11 @@
 					834BFCE6C14AD072CC3B69B0 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
+					};
+					F6608D6CBE0432B58248FB2E = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 19593A2206F90461DC77130F;
 					};
 				};
 			};
@@ -257,6 +300,7 @@
 			targets = (
 				19593A2206F90461DC77130F /* Pad */,
 				834BFCE6C14AD072CC3B69B0 /* PadTests */,
+				F6608D6CBE0432B58248FB2E /* PadUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -310,9 +354,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A389263C346BABD4621DCDF1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		968BD580BEF6DD5120C2577C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 19593A2206F90461DC77130F /* Pad */;
+			targetProxy = A08825A5F349CEF9F9FBDF51 /* PBXContainerItemProxy */;
+		};
 		CFE9B9DD3085F776E9366E56 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 19593A2206F90461DC77130F /* Pad */;
@@ -321,6 +378,24 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		2E1B4B629D459D67E5416421 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER).uitests";
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = Pad;
+			};
+			name = Debug;
+		};
 		3A22E3BE8473A5C0759540C3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -357,6 +432,24 @@
 				SDKROOT = macosx;
 			};
 			name = Debug;
+		};
+		99C8F6671E3994E3928729BB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PAD_APP_IDENTIFIER).uitests";
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = Pad;
+			};
+			name = Release;
 		};
 		AEAE7819B629352447A733CA /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -544,6 +637,15 @@
 			buildConfigurations = (
 				EEB048E5EA50464666D28179 /* Debug */,
 				3A22E3BE8473A5C0759540C3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		84747F92E2A5C00F0BC13D4C /* Build configuration list for PBXNativeTarget "PadUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2E1B4B629D459D67E5416421 /* Debug */,
+				99C8F6671E3994E3928729BB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

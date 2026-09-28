@@ -242,6 +242,15 @@ final class PadDocument {
         }
     }
 
+    func showCurrent(now: Date = .now) {
+        guard !isBusy else { return }
+        if isVisible {
+            show()
+        } else {
+            toggle(now: now)
+        }
+    }
+
     func commandNew(now: Date = .now) {
         newFile(now: now)
     }

@@ -57,6 +57,16 @@ jobs:
               "-only-testing:PadTests/$suite" \
               CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= test | tee -a build.log
           done
+      - name: Test application interactions
+        if: github.event_name != 'workflow_dispatch' || inputs.window_tests
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          sudo /usr/sbin/DevToolsSecurity -enable
+          xcodebuild -project Pad.xcodeproj -scheme 'Pad UI Tests' -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build/UI \
+            -resultBundlePath build/UI.xcresult -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= test | tee -a build.log
       - name: Build Release
         run: |
           xcodebuild -project Pad.xcodeproj -scheme Pad -configuration Release \

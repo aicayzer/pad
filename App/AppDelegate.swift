@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         guard !Self.isTestHost else { return false }
-        if !document.isVisible { document.toggle() }
+        document.showCurrent()
         return false
     }
 

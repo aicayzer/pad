@@ -96,7 +96,30 @@ targets:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/$(PAD_DISPLAY_NAME).app/Contents/MacOS/$(PAD_DISPLAY_NAME)
         BUNDLE_LOADER: $(TEST_HOST)
         ENABLE_HARDENED_RUNTIME: NO
+  PadUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Pad
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PAD_APP_IDENTIFIER).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Pad
+        ENABLE_HARDENED_RUNTIME: NO
 schemes:
+  Pad UI Tests:
+    build:
+      targets:
+        Pad: all
+        PadUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - name: PadUITests
+          parallelizable: false
   Pad:
     build:
       targets:
