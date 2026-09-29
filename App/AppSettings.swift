@@ -13,6 +13,9 @@ final class AppSettings {
     var accent: AccentChoice { didSet { defaults.set(accent.rawValue, forKey: "accent") } }
     var customAccent: String { didSet { defaults.set(customAccent, forKey: "customAccent") } }
     private(set) var activationPolicyError: String?
+    private(set) var isChangingActivationPolicy = false
+    @ObservationIgnored private var activationGeneration = 0
+    @ObservationIgnored private weak var activationWindow: NSWindow?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -52,12 +55,34 @@ final class AppSettings {
     func applyActivationPolicy() {
         let policy: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { activationPolicyError = nil; return }
-        let wasActive = NSApp.isActive
+        let keyWindow = NSApp.keyWindow ?? activationWindow
+        let restoreFocus = (NSApp.isActive || isChangingActivationPolicy) && keyWindow?.isVisible == true
+        activationGeneration += 1
+        let generation = activationGeneration
+        activationWindow = restoreFocus ? keyWindow : nil
+        isChangingActivationPolicy = restoreFocus
         let applied = NSApp.setActivationPolicy(policy)
-        // Changing policy schedules an activation yield; cancel it while Settings still has focus.
-        if applied && wasActive { NSApp.activate() }
         activationPolicyError = applied || NSApp.activationPolicy() == policy
             ? nil : "Could not update Dock visibility. Try changing the setting again."
+        guard applied, restoreFocus else {
+            isChangingActivationPolicy = false
+            activationWindow = nil
+            return
+        }
+        // AppKit yields activation after changing policy. Restore the user's window after that yield,
+        // without treating the intervening resignation as a departure from Settings.
+        DispatchQueue.main.async { [weak self, weak keyWindow] in
+            guard let self, self.activationGeneration == generation else { return }
+            if NSApp.activationPolicy() == policy, let keyWindow, keyWindow.isVisible {
+                NSApp.activate()
+                keyWindow.makeKeyAndOrderFront(nil)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.activationGeneration == generation else { return }
+                self.activationWindow = nil
+                self.isChangingActivationPolicy = false
+            }
+        }
     }
 }
 

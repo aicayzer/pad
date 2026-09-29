@@ -41,14 +41,25 @@ struct SettingsView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
-            guard notification.object as? NSWindow === settingsWindow else { return }
+            guard notification.object as? NSWindow === settingsWindow,
+                  !settings.isChangingActivationPolicy else { return }
             DispatchQueue.main.async {
+                guard !settings.isChangingActivationPolicy else { return }
                 // A color or file panel is still part of Settings, not dismissal to another app.
                 if !NSApp.isActive || document.isActive { releaseSettingsFocus() }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            if document.settingsPresented { releaseSettingsFocus() }
+            if document.settingsPresented, !settings.isChangingActivationPolicy { releaseSettingsFocus() }
+        }
+        .onChange(of: settings.isChangingActivationPolicy) { _, changing in
+            guard !changing else { return }
+            if settingsWindow?.isKeyWindow == true {
+                document.settingsPresented = true
+                document.isActive = false
+            } else if !NSApp.isActive, document.settingsPresented {
+                releaseSettingsFocus()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in login.refresh() }
     }

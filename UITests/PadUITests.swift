@@ -299,6 +299,10 @@ final class PadUITests: XCTestCase {
             predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.accessory.rawValue),
             object: process)
         XCTAssertEqual(XCTWaiter.wait(for: [accessory], timeout: 5), .completed)
+        let staysActive = XCTNSPredicateExpectation(predicate: NSPredicate(format: "active == true"), object: process)
+        XCTAssertEqual(XCTWaiter.wait(for: [staysActive], timeout: 5), .completed,
+                       "Changing access must keep Settings active without a test-driven activation")
+        XCTAssertTrue(editor.exists, "Changing access must not dismiss the draft behind Settings")
         selectTab("Files", in: settings)
         XCTAssertTrue(settings.staticTexts["Save automatically"].firstMatch.waitForExistence(timeout: 5))
         expectValue(draft, in: editor)
@@ -327,6 +331,12 @@ final class PadUITests: XCTestCase {
         app.typeText(" still editing")
         expectValue(draft + " still editing", in: editor)
         attach(app.screenshot(), name: "Draft preserved through Dock visibility changes")
+        XCUIApplication(bundleIdentifier: "com.apple.finder").activate()
+        let close = app.buttons["Close PadPad"].firstMatch
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false OR hittable == false"), object: close)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed,
+                       "A real departure must still dismiss the draft after the access transition")
     }
 
     func testSettingsPagesLightDarkAndInactiveAppearance() throws {
