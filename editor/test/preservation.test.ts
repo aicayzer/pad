@@ -1,0 +1,63 @@
+import { expect, test } from "vitest";
+import { editorViewCtx } from "@milkdown/kit/core";
+import type { Ctx } from "@milkdown/kit/ctx";
+import { PadEditor } from "../src/editor";
+import { roundTrip, withEditor } from "./harness";
+import { serialize } from "../src/dialect";
+
+const literals = [
+  "<section>Hello **there**</section>",
+  "![Picture](https://example.com/picture.png)",
+  '[reference][id]\n\n[id]: https://example.com "Title"',
+  "| Name | Value |\n| --- | --- |\n| One | Two |",
+  "Footnote[^one]\n\n[^one]: Original footnote",
+  "---\ntitle: Private draft\n---",
+];
+for (const raw of literals) {
+  test(`unsupported content survives adjacent editing: ${raw.split("\n")[0]}`, async () => {
+    const input = `${raw}\n\nOrdinary text\n`;
+    const result = await withEditor(input, (editor) => {
+      const view = editor.ctx.get(editorViewCtx);
+      const end = view.state.doc.content.size - 1;
+      view.dispatch(view.state.tr.insertText(" edited", end));
+      expect(view.dom.querySelector("img")).toBeNull();
+      return serialize(editor.ctx);
+    });
+    expect(result).toContain(raw);
+    expect(result).toContain("Ordinary text edited");
+    expect(await roundTrip(result)).toBe(result);
+  });
+}
+
+test("noncanonical supported Markdown stays formatted and unchanged until edited", async () => {
+  const root = document.createElement("div");
+  document.body.append(root);
+  const changes: Array<{ markdown: string; generation: number }> = [];
+  const editor = await PadEditor.mount(root, {
+    changed: (markdown, generation) => changes.push({ markdown, generation }),
+    stateChanged() {},
+    openLink() {},
+    copy() {},
+  });
+  editor.load("__bold__ and _italic_\n", 4);
+  expect(root.querySelector("strong")?.textContent).toBe("bold");
+  expect(root.querySelector("em")?.textContent).toBe("italic");
+  expect(root.querySelector("textarea")).toBeNull();
+  expect(editor.markdown()).toBeNull();
+  expect(changes).toEqual([]);
+  const ctx = (editor as unknown as { editor: { ctx: Ctx } }).editor.ctx;
+  const view = ctx.get(editorViewCtx);
+  view.dispatch(
+    view.state.tr.insertText(" now", view.state.doc.content.size - 1),
+  );
+  expect(editor.markdown()).toContain(" now");
+  expect(changes.at(-1)?.generation).toBe(4);
+  editor.load("Second document\n", 5);
+  expect(editor.markdown()).toBeNull();
+  expect(changes.at(-1)?.generation).toBe(4);
+  view.dispatch(
+    view.state.tr.insertText(" changed", view.state.doc.content.size - 1),
+  );
+  expect(changes.at(-1)?.generation).toBe(5);
+  root.remove();
+});
