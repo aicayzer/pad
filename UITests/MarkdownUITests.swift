@@ -171,7 +171,7 @@ final class MarkdownUITests: XCTestCase {
     private func launchPad() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-pad.format", "md", "-pad.saveAutomatically", "NO", "-pad.floating", "NO",
+        app.launchArguments = ["-pad.onboardingCompleted", "YES", "-pad.format", "md", "-pad.saveAutomatically", "NO", "-pad.floating", "NO",
                                "-showInDock", "YES", "-menuBarItem", "NO", "-pad.editingShortcuts", "invalid"]
         app.launch()
         app.typeKey("n", modifierFlags: .command)

@@ -14,5 +14,8 @@ struct AppCommands: Commands {
                 .disabled(!document.isActive)
             Button("Share…") { document.share() }.disabled(!document.isActive)
         }
+        CommandGroup(replacing: .help) {
+            Button("Show PadPad Introduction") { Task { await document.restartOnboarding() } }
+        }
     }
 }
