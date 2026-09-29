@@ -187,7 +187,6 @@ final class PadMarkdownEditorController: NSObject {
                 }
             }
             do {
-                _ = try await self.webView.evaluateJavaScript("window.editor.focus()")
                 try Task.checkCancellation()
                 guard self.generation == expectedGeneration else { throw PadMarkdownEditorError.documentChanged }
                 guard let window, window.isKeyWindow, self.ownsFirstResponder else {
@@ -235,9 +234,16 @@ final class PadMarkdownEditorController: NSObject {
                 return
             }
             guard !pendingEvents.isEmpty else {
+                // Native WebKit focus can restore an old DOM selection. Complete that
+                // transition before setting the ProseMirror selection and admitting keys.
+                guard window.makeFirstResponder(webView) else { throw PadMarkdownEditorError.notReady }
+                _ = try await webView.evaluateJavaScript("window.editor.focus()")
+                try Task.checkCancellation()
+                guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
+                guard window.isKeyWindow, ownsFirstResponder else { throw CancellationError() }
+                if inputBuffer.isComposing || inputBuffer.eventCount > 0 { continue }
                 hasFocusedDocument = true
                 focusTask = nil
-                window.makeFirstResponder(webView)
                 return
             }
             let input = pendingEvents[0]
