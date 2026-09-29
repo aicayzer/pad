@@ -1,6 +1,6 @@
 <img src="Design/Pad.png" width="88" alt="">
 
-# Pad
+# PadPad
 
 [![macOS 27+](https://img.shields.io/badge/macOS-27%2B-202020?logo=apple&logoColor=white)](#install)
 [![Swift](https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
@@ -11,22 +11,23 @@ A lightweight text and Markdown editor for macOS. Open it with a keyboard shortc
 
 ## Install
 
-Requires macOS 27 or later. The current beta is available to invited testers through TestFlight as **PadPad**. The installed app is named **Pad**. A public App Store release is planned.
+Requires macOS 27 or later. The beta is available to invited testers through TestFlight. A public App Store release is planned.
 
 ## Make yourself at home
 
 - Write in a compact, translucent window that stays close at hand.
-- Open, edit, rename, save, and share plain text and Markdown files.
+- Edit formatted Markdown with bold, italic, headings, lists, links, quotes and code, or work in plain text.
+- Open, rename, save, and share `.txt` and `.md` files.
 - Choose scratch writing or automatic saving, with configurable filenames.
-- Reopen recent work or start a fresh file.
+- Return to scratch text within your chosen time away, or start a fresh scratch pad. Temporary scratch text expires after that interval unless saved.
 - Customize shortcuts, accent color, and Dock and menu bar visibility.
 
 ## A few shortcuts
 
 | Shortcut | Action |
 | --- | --- |
-| ⇧⌥B | Show or hide Pad from any app |
-| ⌘N | New text file |
+| ⇧⌥B | Show or hide PadPad from any app |
+| ⌘N | New scratch pad |
 | ⌘O | Open a file |
 | ⌘S | Save |
 | ⇧⌘S | Save As |

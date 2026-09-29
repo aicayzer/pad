@@ -57,7 +57,7 @@ final class PadPanel: NSPanel {
             guard let self else { return }
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
-        }))
+        }).environment(files.appSettings ?? AppSettings()))
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
                                                name: NSApplication.didBecomeActiveNotification, object: nil)
         center()
@@ -72,10 +72,21 @@ final class PadPanel: NSPanel {
             guard let self else { return }
             self.editorFocusScheduled = false
             guard self.isKeyWindow, self.isVisible, !self.files.settingsPresented,
-                  self.firstResponder === self.pendingEditorInput || self.firstResponder === self,
-                  let content = self.contentView, let editor = self.editor(in: content), editor.isEditable else { return }
+                  self.firstResponder === self.pendingEditorInput || self.firstResponder === self else { return }
+            if self.files.currentFormat == .md {
+                guard let editor = self.files.markdownEditor else { return }
+                editor.enqueue(self.pendingEditorInput.takeEvents())
+                return
+            }
+            guard let content = self.contentView, let editor = self.editor(in: content), editor.isEditable else { return }
             self.makeFirstResponder(editor)
         }
+    }
+
+    func prepareMarkdownSnapshot() {
+        guard files.currentFormat == .md, pendingEditorInput.eventCount > 0,
+              let editor = files.markdownEditor else { return }
+        editor.enqueue(pendingEditorInput.takeEvents())
     }
 
     private func editor(in view: NSView) -> NSTextView? {
@@ -161,6 +172,7 @@ final class PadPanel: NSPanel {
 }
 
 private struct PadView: View {
+    @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
     let prepareTitleFocus: () -> Void
@@ -178,7 +190,7 @@ private struct PadView: View {
                         .font(.system(size: 15))
                         .frame(width: 22, height: 26)
                 }
-                .accessibilityLabel("Close Pad")
+                .accessibilityLabel("Close PadPad")
                 if renaming {
                     HStack(spacing: 2) {
                         OverlaySearchField(placeholder: "Name", text: $titleDraft, fontSize: 14,
@@ -187,7 +199,7 @@ private struct PadView: View {
                                                guard renamedDocument == files.documentID else { return }
                                                if files.rename(to: titleDraft) { finishRename() }
                                            }, dismiss: finishRename, blur: { renaming = false })
-                        Text(".\(files.url?.pathExtension ?? files.format.rawValue)")
+                        Text(".\(files.url?.pathExtension ?? files.currentFormat.rawValue)")
                             .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 6)
@@ -235,12 +247,28 @@ private struct PadView: View {
             }
 
             VStack(spacing: 0) {
-                TextEditor(text: $files.text)
-                    .background(EditorFocusMount())
-                    .font(.system(size: 15))
-                    .scrollContentBackground(.hidden)
-                    .focused($editing)
-                    .padding(10)
+                if files.currentFormat == .md {
+                    if let editor = files.markdownEditor {
+                        PadMarkdownToolbar(editor: editor)
+                        PadMarkdownEditorView(editor: editor)
+                            .onChange(of: settings.accentColor, initial: true) {
+                                editor.accentOverride = NSColor(settings.accentColor)
+                            }
+                            .onChange(of: editor.showingLink) {
+                                if !editor.showingLink { files.lostFocus() }
+                            }
+                    } else {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .onAppear { files.mountMarkdownEditor() }
+                    }
+                } else {
+                    TextEditor(text: $files.text)
+                        .background(EditorFocusMount())
+                        .font(.system(size: 15))
+                        .scrollContentBackground(.hidden)
+                        .focused($editing)
+                        .padding(10)
+                }
                 Text(files.error ?? files.notice ?? " ")
                     .foregroundStyle(files.error == nil ? Color.secondary : Color.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -255,6 +283,7 @@ private struct PadView: View {
         // AppKit owns the outside shape, shadow and resize border as one native rounded frame.
         .glassEffect(.regular, in: .rect)
         .ignoresSafeArea()
+        .tint(settings.accentColor)
         .disabled(files.isBusy)
         .defaultFocus($editing, true)
         .onAppear {
@@ -274,6 +303,7 @@ private struct PadView: View {
     private func finishRename() {
         renaming = false
         editing = files.isActive
+        if files.isActive { files.markdownEditor?.focus() }
     }
 
     private func actionIcon(_ symbol: String, label: String, verticalOffset: CGFloat,

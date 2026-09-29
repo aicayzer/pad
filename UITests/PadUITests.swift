@@ -38,12 +38,12 @@ final class PadUITests: XCTestCase {
         attach(settings.screenshot(), name: "Pad Settings General")
 
         selectTab("Files", in: settings)
-        XCTAssertTrue(settings.staticTexts["Save when Pad closes"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(settings.staticTexts["Automatic saving"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         expectValue(original, in: editor)
         attach(settings.screenshot(), name: "Pad Settings Files")
 
         selectTab("Shortcuts", in: settings)
-        XCTAssertTrue(settings.staticTexts["Show or hide Pad"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(settings.staticTexts["Show or hide PadPad Dev"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         expectValue(original, in: editor)
         attach(settings.screenshot(), name: "Pad Settings Shortcuts")
 
@@ -64,7 +64,7 @@ final class PadUITests: XCTestCase {
         attach(app.screenshot(), name: "Pad fresh file from Command N")
 
         app.typeKey(.escape, modifierFlags: [])
-        let close = app.buttons["Close Pad"].firstMatch
+        let close = app.buttons["Close PadPad"].firstMatch
         let dismissed = NSPredicate(format: "exists == false OR hittable == false")
         expectation(for: dismissed, evaluatedWith: close)
         waitForExpectations(timeout: 5)
@@ -90,7 +90,7 @@ final class PadUITests: XCTestCase {
         attach(XCUIScreen.main.screenshot(), name: "Folder sheet above floating Settings and Pad")
         cancel.click()
         expectValue(draft, in: editor)
-        let close = app.buttons["Close Pad"].firstMatch
+        let close = app.buttons["Close PadPad"].firstMatch
         // Settings remains key: the first click must work on Pad's inactive toolbar.
         XCTAssertTrue(close.isEnabled, app.debugDescription)
         XCTAssertTrue(close.isHittable, app.debugDescription)
@@ -123,7 +123,7 @@ final class PadUITests: XCTestCase {
         editor.click()
         app.typeKey(.downArrow, modifierFlags: .command)
         app.typeText(" with unsaved changes")
-        let close = app.buttons["Close Pad"].firstMatch
+        let close = app.buttons["Close PadPad"].firstMatch
         close.click()
         let keep = app.buttons["Keep Editing"].firstMatch
         XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
@@ -160,7 +160,7 @@ final class PadUITests: XCTestCase {
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
         finder.activate()
         XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
-        let close = app.buttons["Close Pad"].firstMatch
+        let close = app.buttons["Close PadPad"].firstMatch
         let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false OR hittable == false"), object: close)
         XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed)
 
@@ -267,7 +267,7 @@ final class PadUITests: XCTestCase {
         expectValue("Draft after custom shortcut", in: editor)
         app.typeKey("n", modifierFlags: .command)
         expectValue("", in: editor)
-        attach(app.screenshot(), name: "Restored New Text File shortcut")
+        attach(app.screenshot(), name: "Restored New Scratch Pad shortcut")
     }
 
     func testDockToggleKeepsSettingsAndDraftUsable() throws {
@@ -281,7 +281,7 @@ final class PadUITests: XCTestCase {
         let settings = app.windows["com_apple_SwiftUI_Settings_window"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         selectTab("General", in: settings)
-        let dock = settings.switches["showInDock"]
+        let dock = settings.popUpButtons["appAccess"]
         XCTAssertTrue(dock.waitForExistence(timeout: 5), settings.debugDescription)
         let testBundleID = try XCTUnwrap(Bundle(for: Self.self).bundleIdentifier)
         XCTAssertTrue(testBundleID.hasSuffix(".uitests"))
@@ -294,22 +294,32 @@ final class PadUITests: XCTestCase {
             object: process)
         XCTAssertEqual(XCTWaiter.wait(for: [initialRegular], timeout: 5), .completed)
         dock.click()
+        app.menuItems["Menu bar"].click()
         let accessory = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.accessory.rawValue),
             object: process)
         XCTAssertEqual(XCTWaiter.wait(for: [accessory], timeout: 5), .completed)
         selectTab("Files", in: settings)
-        XCTAssertTrue(settings.staticTexts["Save when Pad closes"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(settings.staticTexts["Automatic saving"].firstMatch.waitForExistence(timeout: 5))
         expectValue(draft, in: editor)
         selectTab("General", in: settings)
         attach(settings.screenshot(), name: "Settings remains usable without Dock icon")
         dock.click()
+        app.menuItems["Dock"].click()
         let regular = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.regular.rawValue),
             object: process)
         XCTAssertEqual(XCTWaiter.wait(for: [regular], timeout: 5), .completed)
+        dock.click()
+        app.menuItems["Dock and menu bar"].click()
+        let bothRegular = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.regular.rawValue),
+            object: process)
+        XCTAssertEqual(XCTWaiter.wait(for: [bothRegular], timeout: 5), .completed)
+        expectValue("Dock and menu bar", in: dock)
+        attach(settings.screenshot(), name: "Dock and menu bar access selected")
         selectTab("Shortcuts", in: settings)
-        XCTAssertTrue(settings.staticTexts["Show or hide Pad"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(settings.staticTexts["Show or hide PadPad Dev"].firstMatch.waitForExistence(timeout: 5))
         settings.buttons["_XCUI:CloseWindow"].click()
         editor.click()
         expectValue(draft, in: editor)
@@ -319,11 +329,102 @@ final class PadUITests: XCTestCase {
         attach(app.screenshot(), name: "Draft preserved through Dock visibility changes")
     }
 
+    func testSettingsPagesLightDarkAndInactiveAppearance() throws {
+        let app = launchPad()
+        defer { app.terminate() }
+        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 10))
+        app.typeText("Disposable Settings appearance draft")
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
+        selectTab("General", in: settings)
+        let appearance = settings.popUpButtons["Appearance"].firstMatch
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5), settings.debugDescription)
+        let originalAppearance = try XCTUnwrap(appearance.value as? String)
+        XCTAssertTrue(["System", "Light", "Dark"].contains(originalAppearance))
+        defer {
+            app.activate()
+            selectTab("General", in: settings)
+            appearance.click()
+            app.menuItems[originalAppearance].click()
+        }
+        // Availability is covered here; changing login registration needs a separate installed-app check.
+        XCTAssertTrue(settings.staticTexts["Open at login"].firstMatch.exists, settings.debugDescription)
+        for mode in ["Light", "Dark"] {
+            selectTab("General", in: settings)
+            appearance.click()
+            app.menuItems[mode].click()
+            expectValue(mode, in: appearance)
+            XCTAssertTrue(appearance.isEnabled)
+            attach(settings.screenshot(), name: "Settings General \(mode)")
+            selectTab("Files", in: settings)
+            XCTAssertTrue(settings.staticTexts["Automatic saving"].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertTrue(settings.popUpButtons["Scratch lifetime"].firstMatch.isEnabled)
+            attach(settings.screenshot(), name: "Settings Files \(mode)")
+            selectTab("Shortcuts", in: settings)
+            XCTAssertTrue(settings.staticTexts["Show or hide PadPad Dev"].firstMatch.waitForExistence(timeout: 5))
+            attach(settings.screenshot(), name: "Settings Shortcuts \(mode)")
+            selectTab("About", in: settings)
+            XCTAssertTrue(settings.staticTexts["A scratch pad for text and Markdown."].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertFalse(settings.staticTexts["Open at login"].firstMatch.exists)
+            attach(settings.screenshot(), name: "Settings About \(mode)")
+        }
+        selectTab("General", in: settings)
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        finder.activate()
+        XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
+        XCTAssertTrue(settings.exists, app.debugDescription)
+        XCTAssertTrue(appearance.isEnabled, "Inactive appearance must not disable Settings controls")
+        attach(settings.screenshot(), name: "Inactive Settings retains enabled controls")
+        app.activate()
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectTab("Files", in: settings)
+        XCTAssertTrue(settings.buttons["Choose…"].firstMatch.isEnabled)
+        attach(settings.screenshot(), name: "Settings active again after Finder")
+    }
+
+    func testMinimizedSettingsDoesNotChangeMenuBarActivationPolicy() throws {
+        let app = launchPad()
+        defer { app.terminate() }
+        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 10))
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectTab("General", in: settings)
+        let minimize = settings.buttons["_XCUI:MinimizeWindow"].firstMatch
+        guard minimize.exists, minimize.isEnabled else {
+            attach(settings.screenshot(), name: "Settings does not offer minimization")
+            throw XCTSkip("Settings does not offer an enabled minimize control; minimized-window Dock behavior was not exercised.")
+        }
+        let bundleID = try XCTUnwrap(Bundle(for: Self.self).bundleIdentifier)
+        XCTAssertTrue(bundleID.hasSuffix(".uitests"))
+        let target = String(bundleID.dropLast(".uitests".count))
+        let process = try XCTUnwrap(NSRunningApplication.runningApplications(withBundleIdentifier: target).first)
+        let access = settings.popUpButtons["appAccess"]
+        access.click()
+        app.menuItems["Menu bar"].click()
+        expectValue("Menu bar", in: access)
+        XCTAssertEqual(process.activationPolicy, .accessory)
+        minimize.click()
+        let minimized = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == false"), object: access)
+        XCTAssertEqual(XCTWaiter.wait(for: [minimized], timeout: 5), .completed)
+        // A minimized-window thumbnail is independent of a running-app Dock icon.
+        XCTAssertEqual(process.activationPolicy, .accessory)
+        attach(XCUIScreen.main.screenshot(), name: "Minimized Settings with accessory activation policy")
+        app.activate()
+        app.typeKey(",", modifierFlags: .command)
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"), object: access)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed, app.debugDescription)
+        XCTAssertEqual(process.activationPolicy, .accessory)
+        expectValue("Menu bar", in: access)
+        attach(settings.screenshot(), name: "Settings reopened with menu bar access unchanged")
+    }
+
     private func launchPad(floating: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         // Launch overrides establish a deterministic initial state without changing saved values.
-        app.launchArguments = ["-pad.saveAutomatically", "NO", "-pad.floating", floating ? "YES" : "NO",
+        app.launchArguments = ["-pad.format", "txt", "-pad.saveAutomatically", "NO", "-pad.floating", floating ? "YES" : "NO",
                                "-showInDock", "YES", "-menuBarItem", "NO",
                                "-pad.editingShortcuts", "invalid",
                                "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#]

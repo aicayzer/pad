@@ -6,6 +6,7 @@ import Testing
 @Suite struct PadTests {
     private func fixture(
         defaults suppliedDefaults: UserDefaults? = nil,
+        format: PadFormat? = .txt,
         noticeDuration: Duration = .seconds(2),
         selectOpenFile: (@MainActor () async -> URL?)? = nil,
         selectSaveFile: (@MainActor (URL, String) async -> URL?)? = nil,
@@ -15,6 +16,7 @@ import Testing
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let suite = "pad-tests-\(UUID().uuidString)"
         let defaults = suppliedDefaults ?? UserDefaults(suiteName: suite)!
+        if suppliedDefaults == nil, let format { defaults.set(format.rawValue, forKey: "pad.format") }
         var copiedPath: String?
         let files = PadDocument(defaults: defaults, defaultFolder: root,
                             presentsWindow: false, noticeDuration: noticeDuration, copyPath: { copiedPath = $0 },
@@ -74,17 +76,21 @@ import Testing
     }
 
     @Test func defaultsAndPreferencesPersist() throws {
-        let (files, root, defaults, _) = try fixture()
+        let (files, root, defaults, _) = try fixture(format: nil)
         defer { try? FileManager.default.removeItem(at: root) }
-        #expect(files.format == .txt)
+        #expect(files.format == .md)
         #expect(files.saveAutomatically)
         #expect(files.reusePeriod == .fifteenMinutes)
-        files.format = .md
+        files.format = .txt
         files.saveAutomatically = false
         files.reusePeriod = .fiveMinutes
-        #expect(defaults.string(forKey: "pad.format") == "md")
+        #expect(defaults.string(forKey: "pad.format") == "txt")
         #expect(defaults.bool(forKey: "pad.saveAutomatically") == false)
         #expect(defaults.integer(forKey: "pad.reusePeriod") == 5)
+        let (restored, restoredRoot, _, _) = try fixture(defaults: defaults)
+        defer { try? FileManager.default.removeItem(at: restoredRoot) }
+        #expect(restored.format == .txt)
+        #expect(restored.currentFormat == .txt)
     }
 
     @Test func dateNameAvoidsExistingFileAndCopiesPath() async throws {
@@ -98,6 +104,7 @@ import Testing
                                                   format: .md, now: now, number: 1).url
         #expect(second.lastPathComponent.hasSuffix("-002.md"))
         files.format = .md
+        files.newFile()
         files.text = "# Direct file\n"
         files.save()
         let saved = try #require(files.url)
@@ -142,12 +149,13 @@ import Testing
         let start = Date(timeIntervalSince1970: 1_790_113_017)
         files.newFile(now: start)
         files.text = "hello world"
-        files.close()
+        files.close(now: start)
         let saved = try #require(files.url)
         files.toggle(now: start.addingTimeInterval(14 * 60))
         #expect(files.text == "hello world")
         #expect(files.url == saved)
-        files.toggle(now: start.addingTimeInterval(15 * 60))
+        files.close(now: start.addingTimeInterval(14 * 60))
+        files.toggle(now: start.addingTimeInterval(29 * 60))
         #expect(files.text.isEmpty)
         #expect(try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).count == 1)
     }
@@ -175,7 +183,7 @@ import Testing
         #expect(try String(contentsOf: original, encoding: .utf8) == "scratch")
     }
 
-    @Test func freshTriggerSavesPreviousFileWhileScratchModeDiscardsIt() throws {
+    @Test func freshTriggerSavesPreviousFileWhileCloseRetainsUnsavedScratch() throws {
         let (files, root, _, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }
         files.newFile()
@@ -187,7 +195,7 @@ import Testing
         files.saveAutomatically = false
         files.text = "scratch"
         files.close()
-        #expect(files.text.isEmpty)
+        #expect(files.text == "scratch")
         #expect(files.url == nil)
         #expect(try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).count == 1)
     }

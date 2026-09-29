@@ -13,6 +13,7 @@ struct PanelTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let suite = "pad-panel-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.set("txt", forKey: "pad.format")
         let document = PadDocument(defaults: defaults, defaultFolder: root,
                                    noticeDuration: .milliseconds(150), copyPath: { _ in })
         let initialWindows = Set(NSApp.windows.map(ObjectIdentifier.init))
@@ -126,6 +127,7 @@ struct PanelTests {
         let root = FileManager.default.temporaryDirectory.appending(path: "pad-close-\(UUID().uuidString)")
         let suite = "pad-close-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.set("txt", forKey: "pad.format")
         let document = PadDocument(defaults: defaults, defaultFolder: root, copyPath: { _ in })
         defer {
             document.saveAutomatically = false

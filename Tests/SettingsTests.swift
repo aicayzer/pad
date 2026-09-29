@@ -41,6 +41,35 @@ import Testing
         #expect(isolated.accent == .standard)
     }
 
+    @Test(arguments: [AppAccess.dock, .menuBar, .both, .shortcutOnly])
+    func accessPreservesExistingVisibilityPreferences(_ access: AppAccess) {
+        let suite = "pad-settings-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(access.showInDock, forKey: "showInDock")
+        defaults.set(access.menuBarItem, forKey: "menuBarItem")
+
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.access == access)
+        #expect(defaults.bool(forKey: "showInDock") == access.showInDock)
+        #expect(defaults.bool(forKey: "menuBarItem") == access.menuBarItem)
+        #expect(!AppAccess.visibleChoices.contains(.shortcutOnly))
+    }
+
+    @Test func accessCannotRemoveBothEntryPointsWithoutShortcut() {
+        let suite = "pad-settings-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+
+        settings.setAccess(.shortcutOnly, hasGlobalShortcut: false)
+
+        #expect(settings.access == .both)
+        #expect(defaults.object(forKey: "showInDock") == nil)
+        #expect(defaults.object(forKey: "menuBarItem") == nil)
+    }
+
     @Test func systemAccentUsesMacOSColor() {
         let suite = "pad-settings-tests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

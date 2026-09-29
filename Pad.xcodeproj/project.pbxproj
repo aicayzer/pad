@@ -10,8 +10,10 @@
 		08C4CCDBFAEBCEA878B7136A /* PadFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C08C107A050CE1BE5CFD47 /* PadFilename.swift */; };
 		0CAAEF1C3A635923D1279E8C /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C376BFA6787DB6FC30A88D8B /* AppSettings.swift */; };
 		1A4EBF4B1DBF34CEADA7E2B8 /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EE3051475194A0CE9CC409 /* Shortcuts.swift */; };
+		1E8EF55943DDB98C48CA2568 /* PadMarkdownEditorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D0C4EED67E39E80A31F86B /* PadMarkdownEditorController.swift */; };
 		269569C2B306932754F49196 /* DocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89C30E859A54BC39F6D3B16 /* DocumentTests.swift */; };
 		27853BDC976688B83D91EB55 /* PadPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C1A9D1A42A38485980FBF8 /* PadPanel.swift */; };
+		2F59C1F6B0F4A22BFABD369F /* PadMarkdownEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2270747D70C4E1146AEDFBCF /* PadMarkdownEditorView.swift */; };
 		42356443B8A156132E766111 /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC1CF8AF4A606ECB6356B6E /* SettingsTests.swift */; };
 		4A9D05F8B6B3F70EB3E35D6B /* EditingShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49911DB95E3D6EA38BE56605 /* EditingShortcuts.swift */; };
 		4AA5982F109490D3B74FBED0 /* FilenameInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2694A6E13E03EDC77FA2FD0 /* FilenameInputTests.swift */; };
@@ -19,10 +21,12 @@
 		526DCE0C48A6A195CF22E1AA /* EditingShortcutSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C16634974372D9E6C8040DF /* EditingShortcutSettings.swift */; };
 		52C93C566913D64AD4B6F467 /* OpensWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = E538FE74AA4DB07FF073916E /* OpensWindows.swift */; };
 		56B2968316BB77C15DB0AC99 /* OverlaySearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37EF93D16D030F218B3225EE /* OverlaySearchField.swift */; };
+		63D4BDA44B8FA2CCDDD0C4FC /* ScratchLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AABBBE4978556123DE2C134 /* ScratchLifecycleTests.swift */; };
 		6B6D46D5A693330673E58DE1 /* PadNamingSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5F9400C1E9EF196E78434E /* PadNamingSettings.swift */; };
 		713004856210BCA181389388 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 1C342CF42DD9556B1B21F222 /* KeyboardShortcuts */; };
 		72F23CF65A1E51473CA9B6F3 /* LoginItemSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD0E2FE5F4ED346DE0AF7E3 /* LoginItemSettings.swift */; };
 		88BD1FD4C14239700DDF38BF /* FilenameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA792584AF84059A2B6EDBA4 /* FilenameTests.swift */; };
+		916B62F7E9353B6C7ECC7CA8 /* MarkdownUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04BF215CC52C94086A9E4F54 /* MarkdownUITests.swift */; };
 		9AF5F3D82CC644C13E8468A9 /* PadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D4F8125561D81326487221 /* PadApp.swift */; };
 		9F2D8028F851B85DEF4B513B /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B9385ADB1CD28DEBD5021C16 /* AppIcon.icon */; };
 		A773212ECD37748C92EC805B /* Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FEF301DA1CA940EC7E4697 /* Commands.swift */; };
@@ -30,6 +34,7 @@
 		BA1EC19F6B9F64C9F2D9D824 /* EditingShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5022E10846FC0482266233 /* EditingShortcutTests.swift */; };
 		BEB7038FF6BEAE822F7FDD53 /* DevelopmentBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */; };
 		C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A999B97A56ADD25994D11B77 /* PadUITests.swift */; };
+		C53F5B43A8E926B392C18919 /* MarkdownBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BECEC51394BCF6B42FC781 /* MarkdownBridgeTests.swift */; };
 		D52ADB49D8B0EF9B37F57D43 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8973E101DCBB6B34544E1C63 /* AppDelegate.swift */; };
 		D546D3C0B92484843E80398A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D843D996E9C2857B0E6072A1 /* Assets.xcassets */; };
 		D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */; };
@@ -57,9 +62,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		04BF215CC52C94086A9E4F54 /* MarkdownUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownUITests.swift; sourceTree = "<group>"; };
 		0AC85B4C5EF3BDE2FF730BC8 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		11BECEC51394BCF6B42FC781 /* MarkdownBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBridgeTests.swift; sourceTree = "<group>"; };
 		1F25C3713587E03DED4F2128 /* PadUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PadUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2187E3E013FE86C3489E5628 /* PanelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelTests.swift; sourceTree = "<group>"; };
+		2270747D70C4E1146AEDFBCF /* PadMarkdownEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadMarkdownEditorView.swift; sourceTree = "<group>"; };
 		22FEF301DA1CA940EC7E4697 /* Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Commands.swift; sourceTree = "<group>"; };
 		28C281F3B441312B4BE4E113 /* Pad.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pad.entitlements; sourceTree = "<group>"; };
 		2C16634974372D9E6C8040DF /* EditingShortcutSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditingShortcutSettings.swift; sourceTree = "<group>"; };
@@ -68,6 +76,7 @@
 		37EF93D16D030F218B3225EE /* OverlaySearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlaySearchField.swift; sourceTree = "<group>"; };
 		49911DB95E3D6EA38BE56605 /* EditingShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditingShortcuts.swift; sourceTree = "<group>"; };
 		4CC1CF8AF4A606ECB6356B6E /* SettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTests.swift; sourceTree = "<group>"; };
+		5AABBBE4978556123DE2C134 /* ScratchLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScratchLifecycleTests.swift; sourceTree = "<group>"; };
 		621D41FA4140656C065BF7AB /* AppIconDEV.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIconDEV.icon; sourceTree = "<group>"; };
 		646AFD26F1EFB796B0DF5232 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6693BC5C8FE6E04C011F7632 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -77,6 +86,7 @@
 		8973E101DCBB6B34544E1C63 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		933726A377415C032B720BA9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A2694A6E13E03EDC77FA2FD0 /* FilenameInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameInputTests.swift; sourceTree = "<group>"; };
+		A2D0C4EED67E39E80A31F86B /* PadMarkdownEditorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadMarkdownEditorController.swift; sourceTree = "<group>"; };
 		A999B97A56ADD25994D11B77 /* PadUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadUITests.swift; sourceTree = "<group>"; };
 		B89C30E859A54BC39F6D3B16 /* DocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTests.swift; sourceTree = "<group>"; };
 		B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadDocument.swift; sourceTree = "<group>"; };
@@ -151,6 +161,8 @@
 			isa = PBXGroup;
 			children = (
 				37EF93D16D030F218B3225EE /* OverlaySearchField.swift */,
+				A2D0C4EED67E39E80A31F86B /* PadMarkdownEditorController.swift */,
+				2270747D70C4E1146AEDFBCF /* PadMarkdownEditorView.swift */,
 			);
 			path = Editor;
 			sourceTree = "<group>";
@@ -168,6 +180,7 @@
 		A6D7499B2BBCA2AEC185E3F2 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				04BF215CC52C94086A9E4F54 /* MarkdownUITests.swift */,
 				A999B97A56ADD25994D11B77 /* PadUITests.swift */,
 			);
 			path = UITests;
@@ -180,8 +193,10 @@
 				7A5022E10846FC0482266233 /* EditingShortcutTests.swift */,
 				A2694A6E13E03EDC77FA2FD0 /* FilenameInputTests.swift */,
 				BA792584AF84059A2B6EDBA4 /* FilenameTests.swift */,
+				11BECEC51394BCF6B42FC781 /* MarkdownBridgeTests.swift */,
 				E538FE74AA4DB07FF073916E /* OpensWindows.swift */,
 				2187E3E013FE86C3489E5628 /* PanelTests.swift */,
+				5AABBBE4978556123DE2C134 /* ScratchLifecycleTests.swift */,
 				4CC1CF8AF4A606ECB6356B6E /* SettingsTests.swift */,
 			);
 			path = Tests;
@@ -218,6 +233,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = F7DFCCB8848678BA99DA3D82 /* Build configuration list for PBXNativeTarget "Pad" */;
 			buildPhases = (
+				A05A906CD8599F50F608FC3F /* Build editor */,
 				81C4D389AA2F0F3F96EC590A /* Sources */,
 				4E1006A4F71AFC10D1790774 /* Resources */,
 				812EDEB1F0209F0E33A174E5 /* Frameworks */,
@@ -331,6 +347,28 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		A05A906CD8599F50F608FC3F /* Build editor */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build editor";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/zsh;
+			shellScript = "set -euo pipefail\nexport PATH=\"$HOME/Library/pnpm:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nexport CI=true\ncd \"$SRCROOT/editor\"\npnpm install --frozen-lockfile --silent\npnpm build --logLevel warn\nDEST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Editor\"\nmkdir -p \"$DEST\"\ncp dist/index.html \"$DEST/index.html\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		81C4D389AA2F0F3F96EC590A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -348,6 +386,8 @@
 				9AF5F3D82CC644C13E8468A9 /* PadApp.swift in Sources */,
 				D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */,
 				08C4CCDBFAEBCEA878B7136A /* PadFilename.swift in Sources */,
+				1E8EF55943DDB98C48CA2568 /* PadMarkdownEditorController.swift in Sources */,
+				2F59C1F6B0F4A22BFABD369F /* PadMarkdownEditorView.swift in Sources */,
 				6B6D46D5A693330673E58DE1 /* PadNamingSettings.swift in Sources */,
 				27853BDC976688B83D91EB55 /* PadPanel.swift in Sources */,
 				F7515E64199E441474ECBFC3 /* SettingsView.swift in Sources */,
@@ -364,8 +404,10 @@
 				BA1EC19F6B9F64C9F2D9D824 /* EditingShortcutTests.swift in Sources */,
 				4AA5982F109490D3B74FBED0 /* FilenameInputTests.swift in Sources */,
 				88BD1FD4C14239700DDF38BF /* FilenameTests.swift in Sources */,
+				C53F5B43A8E926B392C18919 /* MarkdownBridgeTests.swift in Sources */,
 				52C93C566913D64AD4B6F467 /* OpensWindows.swift in Sources */,
 				4BBBABE5E8263E98D11E059A /* PanelTests.swift in Sources */,
+				63D4BDA44B8FA2CCDDD0C4FC /* ScratchLifecycleTests.swift in Sources */,
 				42356443B8A156132E766111 /* SettingsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -374,6 +416,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				916B62F7E9353B6C7ECC7CA8 /* MarkdownUITests.swift in Sources */,
 				C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -508,7 +551,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -518,11 +561,11 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PAD_APP_IDENTIFIER = me.cyzr.pad;
-				PAD_DISPLAY_NAME = Pad;
+				PAD_DISPLAY_NAME = PadPad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -574,7 +617,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -590,12 +633,12 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PAD_APP_IDENTIFIER = me.cyzr.pad.dev;
-				PAD_DISPLAY_NAME = "Pad Dev";
+				PAD_DISPLAY_NAME = "PadPad Dev";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;

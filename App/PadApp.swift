@@ -13,7 +13,7 @@ struct PadApp: App {
 
         MenuBarExtra(isInserted: Binding(get: { !AppDelegate.isTestHost && delegate.settings.menuBarItem }, set: { delegate.settings.menuBarItem = $0 })) {
             Button("Open \(Bundle.main.displayName)") { delegate.document.showCurrent() }
-            Button("New Text File") { delegate.document.commandNew() }
+            Button("New Scratch Pad") { delegate.document.commandNew() }
             Button("Open File…") { Task { await delegate.document.openPicker() } }
             Divider()
             SettingsLink { Text("Settings…") }

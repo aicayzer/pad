@@ -13,6 +13,7 @@ struct SettingsView: View {
             Tab("General", systemImage: "gearshape") { general }
             Tab("Files", systemImage: "doc") { files }
             Tab("Shortcuts", systemImage: "keyboard") { shortcuts }
+            Tab("About", systemImage: "info.circle") { about }
         }
         .frame(width: 460, height: 580)
         .tint(settings.accentColor)
@@ -67,24 +68,32 @@ struct SettingsView: View {
                 if login.status == .requiresApproval { Button("Allow in Login Items…") { login.openSystemSettings() } }
                 if let error = login.error { Text(error).foregroundStyle(.red) }
                 Toggle("Always on top", isOn: $document.floating)
-                Toggle("Show in Dock", isOn: $settings.showInDock)
-                    .accessibilityIdentifier("showInDock")
-                    .disabled(settings.showInDock && !settings.menuBarItem && shortcut == nil)
-                Toggle("Show in menu bar", isOn: $settings.menuBarItem)
-                    .disabled(settings.menuBarItem && !settings.showInDock && shortcut == nil)
+                Picker("App access", selection: Binding(
+                    get: { settings.access },
+                    set: { settings.setAccess($0, hasGlobalShortcut: shortcut != nil) }
+                )) {
+                    ForEach(AppAccess.visibleChoices) { Text($0.title).tag($0) }
+                    if settings.access == .shortcutOnly {
+                        Text(AppAccess.shortcutOnly.title).tag(AppAccess.shortcutOnly)
+                    }
+                }
+                .tint(.primary)
+                .accessibilityIdentifier("appAccess")
             } header: { Text("App") } footer: {
                 if let error = settings.activationPolicyError { Text(error).foregroundStyle(.red) }
                 if !settings.showInDock && !settings.menuBarItem, let shortcut {
-                    Text("Open Pad with \(shortcut.description).")
+                    Text("Open \(Bundle.main.displayName) with \(shortcut.description).")
                 }
             }
             Section("Appearance") {
                 Picker("Appearance", selection: $settings.appearance) {
                     ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0) }
                 }
+                .tint(.primary)
                 Picker("Accent", selection: $settings.accent) {
                     ForEach(AccentChoice.allCases) { Text($0.title).tag($0) }
                 }
+                .tint(.primary)
                 if settings.accent == .custom {
                     ColorPicker("Accent color", selection: Binding(get: { settings.accentColor }, set: { settings.setCustomAccent($0) }), supportsOpacity: false)
                 }
@@ -95,18 +104,6 @@ struct SettingsView: View {
                 }
                 .disabled(!settings.menuBarItem)
             }
-            Section("About") {
-                LabeledContent("Version", value: "\(Bundle.main.shortVersion) (\(Bundle.main.buildNumber))")
-                Link(destination: URL(string: "https://github.com/aicayzer/pad")!) {
-                    Text("Source Code").foregroundStyle(settings.accentColor)
-                }
-                Link(destination: URL(string: "https://github.com/aicayzer/pad/releases")!) {
-                    Text("Releases").foregroundStyle(settings.accentColor)
-                }
-                Link(destination: URL(string: "https://github.com/aicayzer/pad/blob/main/LICENSE")!) {
-                    Text("License").foregroundStyle(settings.accentColor)
-                }
-            }
         }.formStyle(.grouped)
     }
 
@@ -114,29 +111,38 @@ struct SettingsView: View {
         @Bindable var document = document
         return Form {
             Section {
-                Toggle("Save when Pad closes", isOn: $document.saveAutomatically)
-                LabeledContent("Save to") {
+                Picker("Scratch lifetime", selection: $document.reusePeriod) {
+                    ForEach(PadReuse.allCases) { period in
+                        Text(period.title).tag(period)
+                    }
+                }
+                .tint(.primary)
+                Toggle("Automatic saving", isOn: $document.saveAutomatically)
+            } header: { Text("Scratch pad") } footer: {
+                Text(scratchExplanation)
+            }
+            Section {
+                Picker("Default format", selection: $document.format) {
+                    Text("Markdown (.md)").tag(PadFormat.md)
+                    Text("Plain text (.txt)").tag(PadFormat.txt)
+                }
+                .tint(.primary)
+                LabeledContent("Save location") {
                     Text(document.folder.lastPathComponent).foregroundStyle(.secondary).lineLimit(1).help(document.folder.path)
                     Button("Choose…") { Task { await document.chooseFolder(parent: settingsWindow) } }
+                        .tint(.primary)
                 }
-                if !document.isDefaultFolder { Button("Use Downloads") { document.useDownloads() } }
-                Picker("Default format", selection: $document.format) {
-                    Text("Plain text (.txt)").tag(PadFormat.txt)
-                    Text("Markdown (.md)").tag(PadFormat.md)
+                if !document.isDefaultFolder {
+                    Button("Use Downloads") { document.useDownloads() }
+                        .tint(.primary)
                 }
-            } header: { Text("Saving") } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Includes closing Pad by switching to another app.")
-                    if !document.saveAutomatically {
-                        Text("Unsaved scratch text is discarded when Pad closes. Existing files ask before discarding changes.")
-                    }
-                    if let error = document.error { Text(error).foregroundStyle(.red) }
-                }
+            } header: { Text("New files") } footer: {
+                if let error = document.error { Text(error).foregroundStyle(.red) }
             }
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text("Default filename").fixedSize()
+                        Text("Filename").fixedSize()
                         Spacer(minLength: 0)
                         Text("Example: \(document.namePreview)")
                             .font(.caption)
@@ -147,23 +153,40 @@ struct SettingsView: View {
                     }
                     PadNameField(parts: $document.nameParts).frame(height: 26)
                 }
-            } header: { Text("Naming") } footer: {
-                Text("Add date or number variables with +. Rename an individual file in its title.")
+            } header: { Text("Naming") }
+        }.formStyle(.grouped)
+    }
+
+    private var scratchExplanation: String {
+        if document.saveAutomatically {
+            return "Saves to a file when you close the pad or switch apps."
+        }
+        if document.reusePeriod == .alwaysNew {
+            return "Unsaved scratch text clears on the next opening."
+        }
+        return "Unsaved scratch text clears after \(document.reusePeriod.title) away."
+    }
+
+    private var about: some View {
+        Form {
+            Section {
+                LabeledContent(Bundle.main.displayName, value: "\(Bundle.main.shortVersion) (\(Bundle.main.buildNumber))")
+                Text("A scratch pad for text and Markdown.")
+                    .foregroundStyle(.secondary)
             }
             Section {
-                Picker("Reuse current scratch file", selection: $document.reusePeriod) {
-                    ForEach(PadReuse.allCases) { Text($0.title).tag($0) }
-                }
-            } header: { Text("Reopening") } footer: {
-                Text("Reopen the same scratch file within this interval. New Text File always starts a fresh file. Opened files stay open until you choose another file.")
+                Link("Source Code", destination: URL(string: "https://github.com/aicayzer/pad")!)
+                Link("Releases", destination: URL(string: "https://github.com/aicayzer/pad/releases")!)
+                Link("License", destination: URL(string: "https://github.com/aicayzer/pad/blob/main/LICENSE")!)
             }
+            .tint(.primary)
         }.formStyle(.grouped)
     }
 
     private var shortcuts: some View {
         Form {
             Section("Global Shortcut") {
-                KeyboardShortcuts.Recorder("Show or hide Pad", name: .pad) { value in
+                KeyboardShortcuts.Recorder("Show or hide \(Bundle.main.displayName)", name: .pad) { value in
                     shortcut = value
                     // Keep an entry point when the final global shortcut is removed.
                     if value == nil && !settings.showInDock && !settings.menuBarItem { settings.menuBarItem = true }
@@ -180,6 +203,7 @@ struct SettingsView: View {
                         Text(error).foregroundStyle(.red).font(.caption)
                     }
                     Button("Restore Defaults") { document.editingShortcuts.restoreDefaults() }
+                        .tint(.primary)
                         .disabled(document.editingShortcuts.isDefault)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
