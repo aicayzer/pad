@@ -100,6 +100,48 @@ final class PadUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, app.debugDescription)
     }
 
+    func testSavedFileMouseCloseCanCancelThenDiscard() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "pad-ui-close-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let app = launchPad(floating: true)
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        app.typeText("Saved content")
+        app.typeKey("s", modifierFlags: [.command, .shift])
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), app.debugDescription)
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        app.typeText(directory.path)
+        app.typeKey(.return, modifierFlags: [])
+        let save = sheet.buttons["OKButton"].firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 5), app.debugDescription)
+        save.click()
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: sheet)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
+        editor.click()
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText(" with unsaved changes")
+        let close = app.buttons["Close Pad"].firstMatch
+        close.click()
+        let keep = app.buttons["Keep Editing"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(keep.isHittable, app.debugDescription)
+        attach(XCUIScreen.main.screenshot(), name: "Discard alert above floating Pad")
+        keep.click()
+        expectValue("Saved content with unsaved changes", in: editor)
+        close.click()
+        let discard = app.buttons["Discard Changes"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.click()
+        let hidden = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false OR hittable == false"), object: close)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, app.debugDescription)
+        let saved = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)
+        XCTAssertEqual(try String(contentsOf: saved, encoding: .utf8), "Saved content")
+    }
+
     func testGlobalShortcutOpensOverFinderAndReturnsFocus() {
         let app = launchPad()
         defer { app.terminate() }
