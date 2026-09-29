@@ -10,6 +10,16 @@ declare global {
       markdown(): string | null;
       format(command: FormatCommand, arg?: string | number): void;
       focus(): void;
+      insertText(text: string, generation: number): boolean;
+      keyDown(
+        key: string,
+        code: string,
+        metaKey: boolean,
+        ctrlKey: boolean,
+        altKey: boolean,
+        shiftKey: boolean,
+        generation: number,
+      ): boolean;
       find(text: string): void;
       insertPaths(paths: string[], x: number, y: number): void;
       setAccent(color: string): void;
@@ -76,6 +86,9 @@ window.editor = {
   markdown: () => editor.markdown(),
   format: (command, arg) => editor.format(command, arg),
   focus: () => editor.focus(),
+  insertText: (text, generation) => editor.insertText(text, generation),
+  keyDown: (key, code, meta, ctrl, alt, shift, generation) =>
+    editor.keyDown(key, code, meta, ctrl, alt, shift, generation),
   find: (text) => editor.find(text),
   insertPaths: (paths, x, y) => editor.insertPaths(paths, x, y),
   setAccent: (color) =>

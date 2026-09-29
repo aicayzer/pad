@@ -1,4 +1,3 @@
-import AppKit
 import Observation
 import ServiceManagement
 
@@ -27,10 +26,4 @@ final class LoginItemSettings {
     }
 
     func openSystemSettings() { SMAppService.openSystemSettingsLoginItems() }
-
-    static func isLoginLaunch(_ event: NSAppleEventDescriptor?) -> Bool {
-        guard event?.eventID == kAEOpenApplication,
-              let launch = event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue else { return false }
-        return launch == keyAELaunchedAsLogInItem || launch == keyAELaunchedAsServiceItem
-    }
 }

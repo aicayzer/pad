@@ -468,3 +468,31 @@ test("loading another document clears previous search highlights", async () =>
       getMatchHighlights(ctxOf(editor).get(editorViewCtx).state).find(),
     ).toHaveLength(0);
   }));
+
+test("buffered typing keeps order and applies Markdown input rules", async () =>
+  withPadEditor("", (editor) => {
+    for (const text of ["#", " ", "I", "m"]) editor.insertText(text, 1);
+    expect(editor.markdown()?.trim()).toBe("# Im");
+    expect(
+      ctxOf(editor).get(editorViewCtx).state.selection.$from.parent.type.name,
+    ).toBe("heading");
+  }));
+
+test("buffered text replaces the selection and rejects an old document", async () =>
+  withPadEditor("Original", (editor) => {
+    const view = ctxOf(editor).get(editorViewCtx);
+    view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc)));
+    editor.insertText("Replacement", 1);
+    expect(editor.markdown()?.trim()).toBe("Replacement");
+    expect(() => editor.insertText("stale", 0)).toThrow("Document changed");
+    expect(editor.markdown()?.trim()).toBe("Replacement");
+  }));
+
+test("buffered input leaves active native composition untouched", async () =>
+  withPadEditor("Original", (editor) => {
+    const view = ctxOf(editor).get(editorViewCtx);
+    Object.defineProperty(view, "composing", { get: () => true });
+    expect(editor.insertText("uncommitted", 1)).toBe(false);
+    expect(editor.keyDown("Enter", "", false, false, false, false, 1)).toBe(false);
+    expect(editor.markdown()).toBe(null);
+  }));

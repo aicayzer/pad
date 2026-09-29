@@ -4,6 +4,8 @@ PadPad is a native macOS app for editing individual text and Markdown files. It 
 
 ## Product behavior
 
+- Initial application launch stays hidden, including login launch. A global shortcut, menu command, explicit reopen or file-open event presents the editor. Saved Dock/menu-bar access must remain effective after launch and activation.
+- The Aa control beside Share reveals Markdown formatting controls, hidden initially each session. Formatting shortcuts continue to work while controls are hidden. Use neutral adaptive foreground colors for formatting, not the chosen accent.
 - Scratch text is intentionally temporary, including clipboard cleanup. With automatic saving off, closing hides the scratch pad; reopening within its configured time away restores the text. Reopening after expiry starts empty, without a recovery archive or discard prompt. Start the interval on dismissal and restart it after every reopen/dismiss cycle. Never expire active text or treat Settings and owned dialogs as dismissal. Do not discard scratch text immediately on close or focus loss. Scratch stays in memory only; app termination does not preserve it.
 - Automatic saving and explicit Save preserve work as files. Scratch expiry must never delete saved files or silently discard edits to an opened file.
 - Markdown editing displays editable formatted content without automatic source-mode fallback. Preserve unsupported constructs as literal content and retain the exact source until edited. Plain text remains a separate supported format; no RTF or image management.

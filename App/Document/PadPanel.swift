@@ -25,7 +25,7 @@ final class PadPanel: NSPanel {
     private let quit: @MainActor () -> Void
     private var previousFrame: NSRect?
     private let pendingTitleInput = OverlayInputResponder()
-    private let pendingEditorInput = OverlayInputResponder()
+    private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
 
     var pendingEditorEventCount: Int { pendingEditorInput.eventCount }
@@ -58,6 +58,8 @@ final class PadPanel: NSPanel {
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
         }).environment(files.appSettings ?? AppSettings()))
+        pendingEditorInput.attach(to: self)
+        pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
                                                name: NSApplication.didBecomeActiveNotification, object: nil)
         center()
@@ -72,14 +74,13 @@ final class PadPanel: NSPanel {
             guard let self else { return }
             self.editorFocusScheduled = false
             guard self.isKeyWindow, self.isVisible, !self.files.settingsPresented else { return }
+            guard !self.pendingEditorInput.isComposing else { return }
             let awaitingEditor = self.firstResponder === self.pendingEditorInput || self.firstResponder === self
             if self.files.currentFormat == .md {
                 guard let editor = self.files.markdownEditor else { return }
-                let responder = self.firstResponder as? NSView
-                // Replacing the Markdown document keeps WebKit's responder but resets its DOM focus.
-                let editingMarkdown = responder === editor.webView || responder?.isDescendant(of: editor.webView) == true
-                guard awaitingEditor || editingMarkdown else { return }
-                editor.enqueue(self.pendingEditorInput.takeEvents())
+                // Replacing the document can temporarily buffer input while DOM focus catches up.
+                guard awaitingEditor || editor.ownsFirstResponder else { return }
+                editor.enqueueInputs(self.pendingEditorInput.takeInputs())
                 return
             }
             guard awaitingEditor, let content = self.contentView,
@@ -89,17 +90,24 @@ final class PadPanel: NSPanel {
     }
 
     func prepareMarkdownSnapshot() {
-        guard files.currentFormat == .md, pendingEditorInput.eventCount > 0,
-              let editor = files.markdownEditor else { return }
-        editor.enqueue(pendingEditorInput.takeEvents())
+        guard files.currentFormat == .md, let editor = files.markdownEditor else { return }
+        editor.hasExternalMarkedText = { [weak self] in self?.pendingEditorInput.isComposing == true }
+        guard !pendingEditorInput.isComposing, pendingEditorInput.eventCount > 0 else { return }
+        editor.enqueueInputs(pendingEditorInput.takeInputs())
     }
 
     private func editor(in view: NSView) -> NSTextView? {
-        if let editor = view as? NSTextView, !editor.isFieldEditor { return editor }
+        if let editor = view as? NSTextView, !(editor is MarkdownInputBuffer), !editor.isFieldEditor { return editor }
         for child in view.subviews {
             if let editor = editor(in: child) { return editor }
         }
         return nil
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if files.currentFormat == .md, firstResponder !== pendingEditorInput,
+           files.markdownEditor?.capturePendingInput(event) == true { return }
+        super.sendEvent(event)
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -144,7 +152,8 @@ final class PadPanel: NSPanel {
     override func becomeKey() {
         super.becomeKey()
         files.settingsPresented = false
-        if !(firstResponder is NSTextView) {
+        if !(firstResponder is NSTextView), files.markdownEditor?.ownsFirstResponder != true {
+            pendingEditorInput.attach(to: self)
             makeFirstResponder(pendingEditorInput)
         }
         files.isActive = true
@@ -153,13 +162,17 @@ final class PadPanel: NSPanel {
 
     override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
         let result = super.makeFirstResponder(responder)
-        if result, let editor = responder as? NSTextView, !editor.isFieldEditor {
+        if result, let editor = responder as? NSTextView,
+           !(editor is MarkdownInputBuffer), !editor.isFieldEditor {
             // SwiftUI must finish mounting the editor and its binding before replaying input.
             DispatchQueue.main.async { [weak self, weak editor] in
                 guard let self, let editor, self.isKeyWindow, self.firstResponder === editor else { return }
-                for event in self.pendingEditorInput.takeEvents() {
+                for input in self.pendingEditorInput.takeInputs() {
                     guard self.isKeyWindow, self.firstResponder === editor else { break }
-                    self.sendEvent(event)
+                    switch input {
+                    case .text(let text): editor.insertText(text, replacementRange: editor.selectedRange())
+                    case .key(let event): self.sendEvent(event)
+                    }
                 }
             }
         }
@@ -169,7 +182,6 @@ final class PadPanel: NSPanel {
     override func resignKey() {
         super.resignKey()
         pendingTitleInput.discardEvents()
-        pendingEditorInput.discardEvents()
         files.isActive = false
         files.lostFocus()
     }
@@ -186,6 +198,7 @@ private struct PadView: View {
     @State private var renamedDocument: UUID?
     @FocusState private var editing: Bool
     @State private var shareAnchor = PadShareAnchor()
+    @State private var showingFormatting = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -228,6 +241,22 @@ private struct PadView: View {
                 if files.isDirty { Circle().frame(width: 6, height: 6).foregroundStyle(.secondary) }
                 Spacer()
                 HStack(spacing: 2) {
+                    if files.currentFormat == .md, let editor = files.markdownEditor {
+                        Button {
+                            showingFormatting.toggle()
+                            editor.focus()
+                        } label: {
+                            Image(systemName: "textformat").frame(width: 16)
+                        }
+                        .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
+                        .accessibilityLabel("Formatting")
+                        .accessibilityIdentifier("formattingToggle")
+                        .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
+                        .accessibilityAddTraits(showingFormatting ? .isSelected : [])
+                        .help(showingFormatting ? "Hide formatting" : "Show formatting")
+                        .disabled(!editor.isReady)
+                        .modifier(PadMarkdownLinkPresenter(editor: editor))
+                    }
                     actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
                         files.share(from: shareAnchor.view)
                     }
@@ -254,7 +283,9 @@ private struct PadView: View {
             VStack(spacing: 0) {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
-                        PadMarkdownToolbar(editor: editor)
+                        if showingFormatting {
+                            PadMarkdownToolbar(editor: editor)
+                        }
                         PadMarkdownEditorView(editor: editor)
                             .onChange(of: settings.accentColor, initial: true) {
                                 editor.accentOverride = NSColor(settings.accentColor)
@@ -326,12 +357,13 @@ private struct PadView: View {
 
 private struct PadToolbarButtonStyle: ButtonStyle {
     var primary = false
+    var selected = false
     @State private var hovered = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(primary ? .primary : .secondary)
+            .foregroundStyle(primary || selected ? .primary : .secondary)
             .frame(height: 16)
             .padding(.horizontal, primary ? 14 : 8)
             .padding(.vertical, 4)

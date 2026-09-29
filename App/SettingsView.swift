@@ -81,7 +81,7 @@ struct SettingsView: View {
                 Toggle("Always on top", isOn: $document.floating)
                 Picker("App access", selection: Binding(
                     get: { settings.access },
-                    set: { settings.setAccess($0, hasGlobalShortcut: shortcut != nil) }
+                    set: { settings.setAccess($0, hasGlobalShortcut: shortcut != nil, from: settingsWindow) }
                 )) {
                     ForEach(AppAccess.visibleChoices) { Text($0.title).tag($0) }
                     if settings.access == .shortcutOnly {
@@ -181,7 +181,13 @@ struct SettingsView: View {
     private var about: some View {
         Form {
             Section {
-                LabeledContent(Bundle.main.displayName, value: "\(Bundle.main.shortVersion) (\(Bundle.main.buildNumber))")
+                HStack(spacing: 12) {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                        .accessibilityHidden(true)
+                    LabeledContent(Bundle.main.displayName, value: "\(Bundle.main.shortVersion) (\(Bundle.main.buildNumber))")
+                }
                 Text("A place for text and Markdown.")
                     .foregroundStyle(.secondary)
             }

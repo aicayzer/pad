@@ -9,6 +9,7 @@ final class MarkdownUITests: XCTestCase {
         let app = launchPad()
         defer { app.terminate() }
         waitForEditor(app)
+        XCTAssertFalse(app.buttons["Bold"].exists, "Formatting starts hidden")
 
         let source = "# Disposable Markdown\n\nPasted **bold** and _italic_.\n\n- First item\n- Second item\n\nFinal paragraph"
         paste(source, into: app)
@@ -111,8 +112,11 @@ final class MarkdownUITests: XCTestCase {
         let app = launchPad()
         defer { app.terminate() }
         // No editor click or readiness wait: launch and document replacement own initial focus.
-        let firstText = "Immediate Markdown \(UUID().uuidString)"
-        app.typeText(firstText)
+        let suffix = " Immediate Markdown \(UUID().uuidString)"
+        let firstText = "é" + suffix
+        app.typeKey("e", modifierFlags: .option)
+        app.typeKey("e", modifierFlags: [])
+        app.typeText(suffix)
         let first = try saveAs(app, directory: firstDirectory)
         XCTAssertEqual(try String(contentsOf: first, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), firstText)
 
@@ -127,19 +131,57 @@ final class MarkdownUITests: XCTestCase {
         attach(app.screenshot(), name: "Immediate Markdown typing and saved document isolation")
     }
 
+    func testFormattingTogglePreservesSelectionAndStartsHiddenEachLaunch() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let app = launchPad()
+        defer { app.terminate() }
+        waitForEditor(app)
+        let toggle = app.buttons["formattingToggle"].firstMatch
+        XCTAssertEqual(toggle.value as? String, "Hidden")
+        XCTAssertFalse(app.buttons["Bold"].exists)
+        app.typeText("Selected text")
+        app.typeKey("a", modifierFlags: .command)
+        toggle.click()
+        let bold = app.buttons["Bold"].firstMatch
+        XCTAssertTrue(bold.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(toggle.value as? String, "Shown")
+        app.webViews.firstMatch.hover()
+        attach(app.screenshot(), name: "Formatting row shown beside stable Markdown editor")
+        bold.click()
+        toggle.click()
+        XCTAssertFalse(bold.exists)
+        XCTAssertEqual(toggle.value as? String, "Hidden")
+        // No editor click: toggling chrome must preserve the selected range and keyboard focus.
+        app.typeText("Replacement")
+        let saved = try saveAs(app, directory: directory)
+        let replacement = try String(contentsOf: saved, encoding: .utf8)
+        XCTAssertEqual(replacement.replacingOccurrences(of: "**", with: "").trimmingCharacters(in: .whitespacesAndNewlines), "Replacement")
+        attach(app.screenshot(), name: "Hidden formatting retains editing focus and selection")
+        toggle.click()
+        XCTAssertTrue(bold.waitForExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        app.typeKey("n", modifierFlags: .command)
+        waitForEditor(app)
+        XCTAssertFalse(app.buttons["Bold"].exists, "Formatting visibility is not persisted between launches")
+        XCTAssertEqual(app.buttons["formattingToggle"].firstMatch.value as? String, "Hidden")
+    }
+
     private func launchPad() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-pad.format", "md", "-pad.saveAutomatically", "NO", "-pad.floating", "NO",
                                "-showInDock", "YES", "-menuBarItem", "NO", "-pad.editingShortcuts", "invalid"]
         app.launch()
+        app.typeKey("n", modifierFlags: .command)
         return app
     }
 
     private func waitForEditor(_ app: XCUIApplication) {
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        let bold = app.buttons["Bold"].firstMatch
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND enabled == true"), object: bold)
+        let toggle = app.buttons["formattingToggle"].firstMatch
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND enabled == true"), object: toggle)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed, app.debugDescription)
     }
 
