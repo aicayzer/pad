@@ -7,11 +7,12 @@ enum PadMarkdownFormatCommand: String {
 }
 
 enum PadMarkdownEditorError: LocalizedError {
-    case notReady, documentChanged, invalidResponse, unavailable
+    case notReady, documentChanged, invalidResponse, unavailable, composing
     case script(String)
 
     var errorDescription: String? {
         switch self {
+        case .composing: "Finish entering the current text before saving or closing the document."
         case .notReady: "The Markdown editor is still loading. Please try again."
         case .documentChanged: "The document changed before its text could be read. Please try again."
         case .invalidResponse: "The Markdown editor could not return the document text. Your document has been kept open."
@@ -32,6 +33,7 @@ final class PadMarkdownEditorController: NSObject {
     var accentOverride: NSColor? { didSet { applyAccent() } }
     var allowsFocus = true
     var showingLink = false
+    var hasExternalMarkedText: () -> Bool = { false }
 
     @ObservationIgnored let webView: WKWebView
     @ObservationIgnored private var editorURL: URL?
@@ -41,10 +43,11 @@ final class PadMarkdownEditorController: NSObject {
     @ObservationIgnored private var pendingLoad: (markdown: String, reload: Bool)?
     @ObservationIgnored private var failure: (any Error)?
     @ObservationIgnored private var loadTask: Task<Void, any Error>?
-    @ObservationIgnored private var pendingEvents: [NSEvent] = []
-    @ObservationIgnored private let inputBuffer = OverlayInputResponder()
+    @ObservationIgnored private var pendingEvents: [MarkdownInputBuffer.Input] = []
+    @ObservationIgnored private let inputBuffer = MarkdownInputBuffer()
     @ObservationIgnored private var focusTask: Task<Void, any Error>?
     @ObservationIgnored private var focusRevision = 0
+    @ObservationIgnored private var hasFocusedDocument = false
 
     var ownsFirstResponder: Bool {
         guard let responder = webView.window?.firstResponder else { return false }
@@ -59,6 +62,7 @@ final class PadMarkdownEditorController: NSObject {
         configuration.preferences.isElementFullscreenEnabled = false
         webView = PadMarkdownWebView(frame: .zero, configuration: configuration)
         super.init()
+        inputBuffer.onInput = { [weak self] in self?.focus() }
         (webView as? PadMarkdownWebView)?.onAttach = { [weak self] in self?.onReady() }
         configuration.userContentController.add(PadMarkdownMessageProxy(target: self), name: "host")
         configuration.userContentController.addUserScript(WKUserScript(source: """
@@ -102,6 +106,7 @@ final class PadMarkdownEditorController: NSObject {
         focusTask = nil
         if ownsFirstResponder { webView.window?.makeFirstResponder(inputBuffer) }
         isReady = false
+        hasFocusedDocument = false
         pendingLoad = (markdown, reload)
         if pageReady { applyPendingLoad() }
     }
@@ -140,6 +145,7 @@ final class PadMarkdownEditorController: NSObject {
         guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
         if let failure { throw failure }
         guard isReady else { throw PadMarkdownEditorError.notReady }
+        guard !inputBuffer.isComposing, !hasExternalMarkedText() else { throw PadMarkdownEditorError.composing }
         if !pendingEvents.isEmpty || inputBuffer.eventCount > 0 {
             guard webView.window?.isKeyWindow == true, allowsFocus else {
                 throw PadMarkdownEditorError.notReady
@@ -147,6 +153,7 @@ final class PadMarkdownEditorController: NSObject {
             focus()
         }
         if let focusTask { try await focusTask.value }
+        guard !inputBuffer.isComposing, !hasExternalMarkedText() else { throw PadMarkdownEditorError.composing }
         guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
         let result = try await webView.evaluateJavaScript("window.editor.markdown()")
         guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
@@ -156,7 +163,16 @@ final class PadMarkdownEditorController: NSObject {
     }
 
     func focus() {
-        guard allowsFocus, isReady, let window = webView.window, window.isKeyWindow, focusTask == nil else { return }
+        guard allowsFocus, isReady, let window = webView.window, window.isKeyWindow,
+              focusTask == nil, !inputBuffer.isComposing else { return }
+        inputBuffer.attach(to: window)
+        if hasFocusedDocument, pendingEvents.isEmpty, inputBuffer.eventCount == 0,
+           let responder = window.firstResponder as? NSView, !(responder is MarkdownInputBuffer),
+           responder === webView || responder.isDescendant(of: webView) {
+            // Refocusing the same editor must not disturb native marked text or dead keys.
+            call("focus")
+            return
+        }
         // Do not admit live WebKit keystrokes ahead of the ones waiting for DOM focus.
         // The temporary responder keeps both queues ordered across the asynchronous handoff.
         window.makeFirstResponder(inputBuffer)
@@ -185,15 +201,26 @@ final class PadMarkdownEditorController: NSObject {
         }
     }
 
-    func captureInputDuringFocus(_ event: NSEvent) -> Bool {
-        guard focusTask != nil, event.type == .keyDown else { return false }
-        // DOM focus can move AppKit's responder before its completion callback arrives.
+    func capturePendingInput(_ event: NSEvent) -> Bool {
+        guard (!hasFocusedDocument || focusTask != nil), event.type == .keyDown,
+              let window = webView.window else { return false }
+        // A mounted WebKit view can receive keys before its editable DOM has focus.
+        inputBuffer.attach(to: window)
+        guard window.makeFirstResponder(inputBuffer) else { return false }
         inputBuffer.keyDown(with: event)
         return true
     }
 
     func enqueue(_ events: [NSEvent]) {
-        pendingEvents.append(contentsOf: events)
+        guard let window = webView.window else { return }
+        inputBuffer.attach(to: window)
+        window.makeFirstResponder(inputBuffer)
+        for event in events { inputBuffer.keyDown(with: event) }
+        focus()
+    }
+
+    func enqueueInputs(_ inputs: [MarkdownInputBuffer.Input]) {
+        pendingEvents.append(contentsOf: inputs)
         focus()
     }
 
@@ -202,50 +229,45 @@ final class PadMarkdownEditorController: NSObject {
             try Task.checkCancellation()
             guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
             guard window.isKeyWindow, ownsFirstResponder else { throw CancellationError() }
-            pendingEvents.append(contentsOf: inputBuffer.takeEvents())
+            pendingEvents.append(contentsOf: inputBuffer.takeInputs())
+            guard !inputBuffer.isComposing else {
+                window.makeFirstResponder(inputBuffer)
+                return
+            }
             guard !pendingEvents.isEmpty else {
+                hasFocusedDocument = true
                 focusTask = nil
                 window.makeFirstResponder(webView)
                 return
             }
-            let event = pendingEvents[0]
-            if let text = bufferedText(event) {
-                _ = try await webView.evaluateJavaScript("window.editor.insertText(\(json(text)), \(expectedGeneration))")
+            let input = pendingEvents[0]
+            switch input {
+            case .text(let text):
+                let inserted = try await webView.evaluateJavaScript("window.editor.insertText(\(json(text)), \(expectedGeneration))") as? Bool
                 guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
+                guard inserted == true else { throw PadMarkdownEditorError.notReady }
                 pendingEvents.removeFirst()
-                continue
-            }
-            if let key = bufferedKey(event) {
-                let flags = event.modifierFlags
-                let script = "window.editor.keyDown(\(json(key)), \(json("")), \(flags.contains(.command)), \(flags.contains(.control)), \(flags.contains(.option)), \(flags.contains(.shift)), \(expectedGeneration))"
-                if try await webView.evaluateJavaScript(script) as? Bool == true {
-                    guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
-                    pendingEvents.removeFirst()
-                    continue
+            case .key(let event):
+                if event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+                   let key = bufferedKey(event) {
+                    let flags = event.modifierFlags
+                    let script = "window.editor.keyDown(\(json(key)), \(json("")), \(flags.contains(.command)), \(flags.contains(.control)), \(flags.contains(.option)), \(flags.contains(.shift)), \(expectedGeneration))"
+                    if try await webView.evaluateJavaScript(script) as? Bool == true {
+                        guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
+                        pendingEvents.removeFirst()
+                        continue
+                    }
                 }
-            }
-            // Browser-default actions and app shortcuts retain native handling. Transfer
-            // the remaining FIFO together instead of interleaving it with bridge insertions.
-            pendingEvents.append(contentsOf: inputBuffer.takeEvents())
-            let events = pendingEvents
-            pendingEvents.removeAll()
-            focusTask = nil
-            window.makeFirstResponder(webView)
-            for event in events {
-                guard expectedGeneration == generation, window.isKeyWindow else { break }
+                // App commands leave the input bridge before their document operation snapshots.
+                pendingEvents.removeFirst()
+                hasFocusedDocument = true
+                focusTask = nil
+                window.makeFirstResponder(webView)
                 window.sendEvent(event)
+                if !pendingEvents.isEmpty || inputBuffer.eventCount > 0 { focus() }
+                return
             }
-            return
         }
-    }
-
-    private func bufferedText(_ event: NSEvent) -> String? {
-        guard event.modifierFlags.intersection([.command, .control]).isEmpty,
-              let text = event.characters, !text.isEmpty,
-              text.unicodeScalars.allSatisfy({
-                  !CharacterSet.controlCharacters.contains($0) && !(0xF700...0xF8FF).contains($0.value)
-              }) else { return nil }
-        return text
     }
 
     private func bufferedKey(_ event: NSEvent) -> String? {

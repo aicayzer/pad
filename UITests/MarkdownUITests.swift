@@ -112,8 +112,11 @@ final class MarkdownUITests: XCTestCase {
         let app = launchPad()
         defer { app.terminate() }
         // No editor click or readiness wait: launch and document replacement own initial focus.
-        let firstText = "Immediate Markdown \(UUID().uuidString)"
-        app.typeText(firstText)
+        let suffix = " Immediate Markdown \(UUID().uuidString)"
+        let firstText = "é" + suffix
+        app.typeKey("e", modifierFlags: .option)
+        app.typeKey("e", modifierFlags: [])
+        app.typeText(suffix)
         let first = try saveAs(app, directory: firstDirectory)
         XCTAssertEqual(try String(contentsOf: first, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), firstText)
 

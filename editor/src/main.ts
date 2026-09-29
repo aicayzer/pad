@@ -10,7 +10,7 @@ declare global {
       markdown(): string | null;
       format(command: FormatCommand, arg?: string | number): void;
       focus(): void;
-      insertText(text: string, generation: number): void;
+      insertText(text: string, generation: number): boolean;
       keyDown(
         key: string,
         code: string,

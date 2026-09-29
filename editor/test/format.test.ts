@@ -487,3 +487,12 @@ test("buffered text replaces the selection and rejects an old document", async (
     expect(() => editor.insertText("stale", 0)).toThrow("Document changed");
     expect(editor.markdown()?.trim()).toBe("Replacement");
   }));
+
+test("buffered input leaves active native composition untouched", async () =>
+  withPadEditor("Original", (editor) => {
+    const view = ctxOf(editor).get(editorViewCtx);
+    Object.defineProperty(view, "composing", { get: () => true });
+    expect(editor.insertText("uncommitted", 1)).toBe(false);
+    expect(editor.keyDown("Enter", "", false, false, false, false, 1)).toBe(false);
+    expect(editor.markdown()).toBe(null);
+  }));

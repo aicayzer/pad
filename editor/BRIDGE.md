@@ -13,8 +13,8 @@ Native calls on `window.editor`:
 - `load(markdown, generation)` replaces the document and moves the caret to its end.
 - `reload(markdown, generation)` replaces content while retaining the caret and scroll position.
 - `markdown()` synchronously reads current content, returning `null` if the document matches its loaded baseline. The host must retain the original source in this case, so merely opening a document never rewrites it.
-- `insertText(text, generation)` applies buffered native typing through the editor's input rules and rejects stale documents. The host awaits completion before releasing later typing or taking a snapshot.
-- `keyDown(key, code, metaKey, ctrlKey, altKey, shiftKey, generation)` offers buffered commands to existing keymaps and returns whether they handled the event. Unhandled browser and app keys retain native handling.
+- `insertText(text, generation)` applies buffered native typing through the editor's input rules and rejects stale documents. It returns false during native composition. The host awaits completion before releasing later typing or taking a snapshot.
+- `keyDown(key, code, metaKey, ctrlKey, altKey, shiftKey, generation)` offers buffered commands to existing keymaps and returns whether they handled the event. Unhandled browser and app keys retain native handling. Native buffers resolve dead keys and marked text before calling `insertText`; unfinished composition prevents a snapshot. Never reinterpret raw key events as committed text.
 - `format(command, arg?)`, `focus()`, `find(text)`, `insertPaths(paths, x, y)`, `setAccent(color)`, `setTextSize(px)`, `setKeymap(bindings)`.
 
 Formatting commands are `bold`, `italic`, `strikethrough`, `code`, `heading` (level 1–3), `paragraph`, `codeBlock` (optional language), `quote`, `bulletList`, `orderedList`, `taskList`, and `link` (URL).
