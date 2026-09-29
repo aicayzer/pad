@@ -33,6 +33,7 @@
 		D52ADB49D8B0EF9B37F57D43 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8973E101DCBB6B34544E1C63 /* AppDelegate.swift */; };
 		D546D3C0B92484843E80398A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D843D996E9C2857B0E6072A1 /* Assets.xcassets */; };
 		D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89CBCA5C1484D5B6D1CAD46 /* PadDocument.swift */; };
+		D638E489549576EF21F863C7 /* MenuBarIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FE4A9BA008464CCC18DBB94 /* MenuBarIconPicker.swift */; };
 		D8853F2F3F9F7611671BAB1D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 646AFD26F1EFB796B0DF5232 /* PrivacyInfo.xcprivacy */; };
 		E84E2DEC4BABDF3C1D25B4B7 /* WindowReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3253C726F81CFFFEAA0D8B /* WindowReader.swift */; };
 		F7515E64199E441474ECBFC3 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933726A377415C032B720BA9 /* SettingsView.swift */; };
@@ -71,6 +72,7 @@
 		646AFD26F1EFB796B0DF5232 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6693BC5C8FE6E04C011F7632 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6D5F9400C1E9EF196E78434E /* PadNamingSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadNamingSettings.swift; sourceTree = "<group>"; };
+		6FE4A9BA008464CCC18DBB94 /* MenuBarIconPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIconPicker.swift; sourceTree = "<group>"; };
 		7A5022E10846FC0482266233 /* EditingShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditingShortcutTests.swift; sourceTree = "<group>"; };
 		8973E101DCBB6B34544E1C63 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		933726A377415C032B720BA9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -199,6 +201,7 @@
 				2C16634974372D9E6C8040DF /* EditingShortcutSettings.swift */,
 				6693BC5C8FE6E04C011F7632 /* Info.plist */,
 				BAD0E2FE5F4ED346DE0AF7E3 /* LoginItemSettings.swift */,
+				6FE4A9BA008464CCC18DBB94 /* MenuBarIconPicker.swift */,
 				28C281F3B441312B4BE4E113 /* Pad.entitlements */,
 				E1D4F8125561D81326487221 /* PadApp.swift */,
 				933726A377415C032B720BA9 /* SettingsView.swift */,
@@ -340,6 +343,7 @@
 				526DCE0C48A6A195CF22E1AA /* EditingShortcutSettings.swift in Sources */,
 				4A9D05F8B6B3F70EB3E35D6B /* EditingShortcuts.swift in Sources */,
 				72F23CF65A1E51473CA9B6F3 /* LoginItemSettings.swift in Sources */,
+				D638E489549576EF21F863C7 /* MenuBarIconPicker.swift in Sources */,
 				56B2968316BB77C15DB0AC99 /* OverlaySearchField.swift in Sources */,
 				9AF5F3D82CC644C13E8468A9 /* PadApp.swift in Sources */,
 				D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */,
@@ -514,7 +518,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PAD_APP_IDENTIFIER = me.cyzr.pad;
@@ -586,7 +590,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

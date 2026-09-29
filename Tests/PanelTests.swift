@@ -122,6 +122,33 @@ struct PanelTests {
         #expect(document.text == "Reuse this scratch file.")
     }
 
+    @Test func failedCloseKeepsWindowAndDraftUntilSaveSucceeds() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "pad-close-\(UUID().uuidString)")
+        let suite = "pad-close-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let document = PadDocument(defaults: defaults, defaultFolder: root, copyPath: { _ in })
+        defer {
+            document.saveAutomatically = false
+            document.text = document.savedText
+            document.close()
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        document.newFile()
+        document.text = "Preserve this draft when its save folder is missing."
+        document.close()
+        #expect(document.isVisible)
+        #expect(document.isDirty)
+        #expect(document.error != nil)
+        #expect(!document.isBusy)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        document.close()
+        #expect(!document.isVisible)
+        #expect(!document.isDirty)
+        let saved = try #require(document.url)
+        #expect(try String(contentsOf: saved, encoding: .utf8) == document.text)
+    }
+
     private func command(_ key: KeyboardShortcuts.Key, character: String, in panel: PadPanel) throws -> Bool {
         let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
                                                 timestamp: 0, windowNumber: panel.windowNumber, context: nil,

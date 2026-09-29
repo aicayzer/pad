@@ -117,9 +117,9 @@ final class PadDocument {
     private let defaults: UserDefaults
     private let presentsWindow: Bool
     private let copyPath: @MainActor (String) -> Void
-    private let selectOpenFile: @MainActor () async -> URL?
-    private let selectSaveFile: @MainActor (URL, String) async -> URL?
-    private let discardChanges: @MainActor () -> Bool
+    private let selectOpenFile: (@MainActor () async -> URL?)?
+    private let selectSaveFile: (@MainActor (URL, String) async -> URL?)?
+    private let discardChanges: (@MainActor () -> Bool)?
 
     private static let floatingKey = "pad.floating"
     private static let formatKey = "pad.format"
@@ -152,9 +152,9 @@ final class PadDocument {
         editingShortcuts = EditingShortcuts(defaults: defaults)
         self.presentsWindow = presentsWindow
         self.copyPath = copyPath
-        self.selectOpenFile = selectOpenFile ?? Self.presentOpenPanel
-        self.selectSaveFile = selectSaveFile ?? Self.presentSavePanel
-        self.discardChanges = discardChanges ?? Self.confirmDiscard
+        self.selectOpenFile = selectOpenFile
+        self.selectSaveFile = selectSaveFile
+        self.discardChanges = discardChanges
         #if DEBUG
         let defaultFloating = false
         #else
@@ -192,7 +192,7 @@ final class PadDocument {
         KeyboardShortcuts.onKeyDown(for: .pad) { [weak self] in self?.toggle() }
     }
 
-    func chooseFolder() async {
+    func chooseFolder(parent: NSWindow? = nil) async {
         guard !isBusy else { return }
         operation = .filePanel
         defer { operation = nil }
@@ -202,7 +202,7 @@ final class PadDocument {
         picker.canCreateDirectories = true
         picker.prompt = "Use Folder"
         picker.directoryURL = folder
-        guard await picker.begin() == .OK, let chosen = picker.url else { return }
+        guard await present(picker, parent: parent ?? dialogParent) == .OK, let chosen = picker.url else { return }
         do {
             let data = try chosen.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
             folderScope?.stopAccessingSecurityScopedResource()
@@ -281,15 +281,16 @@ final class PadDocument {
         guard !isBusy else { return }
         operation = .filePanel
         defer { operation = nil }
-        guard let chosen = await selectOpenFile() else { return }
+        let chosen = if let selectOpenFile { await selectOpenFile() } else { await presentOpenPanel() }
+        guard let chosen else { return }
         openDocument(chosen)
     }
 
-    private static func presentOpenPanel() async -> URL? {
+    private func presentOpenPanel() async -> URL? {
         let picker = NSOpenPanel()
         picker.allowedContentTypes = [.plainText, UTType(filenameExtension: "md") ?? .plainText]
         picker.allowsOtherFileTypes = false
-        guard await picker.begin() == .OK else { return nil }
+        guard await present(picker, parent: dialogParent) == .OK else { return nil }
         return picker.url
     }
 
@@ -421,7 +422,12 @@ final class PadDocument {
             notice = nil
             return
         }
-        guard let destination = await selectSaveFile(directory, suggestion.name) else { return }
+        let destination = if let selectSaveFile {
+            await selectSaveFile(directory, suggestion.name)
+        } else {
+            await presentSavePanel(directory: directory, name: suggestion.name)
+        }
+        guard let destination else { return }
         let accessing = destination.startAccessingSecurityScopedResource()
         do {
             if destination.standardizedFileURL == url?.standardizedFileURL,
@@ -449,12 +455,12 @@ final class PadDocument {
         }
     }
 
-    private static func presentSavePanel(directory: URL, name: String) async -> URL? {
+    private func presentSavePanel(directory: URL, name: String) async -> URL? {
         let picker = NSSavePanel()
         picker.allowedContentTypes = [.plainText, UTType(filenameExtension: "md") ?? .plainText]
         picker.directoryURL = directory
         picker.nameFieldStringValue = name
-        guard await picker.begin() == .OK else { return nil }
+        guard await present(picker, parent: dialogParent) == .OK else { return nil }
         return picker.url
     }
 
@@ -520,7 +526,7 @@ final class PadDocument {
             return !isDirty
         }
         if url != nil {
-            guard discardChanges() else { return false }
+            guard discardChanges?() ?? confirmDiscard() else { return false }
         }
         if url == nil { resetDocument() }
         else { text = savedText }
@@ -624,12 +630,32 @@ final class PadDocument {
         panel?.makeKeyAndOrderFront(nil)
     }
 
-    private static func confirmDiscard() -> Bool {
+    private var dialogParent: NSWindow? {
+        if let panel, panel.isVisible { return panel }
+        return NSApp.keyWindow
+    }
+
+    private func present(_ picker: NSSavePanel, parent: NSWindow?) async -> NSApplication.ModalResponse {
+        NSApp.activate()
+        if let parent, parent.isVisible {
+            parent.makeKeyAndOrderFront(nil)
+            return await picker.beginSheetModal(for: parent)
+        }
+        return await picker.begin()
+    }
+
+    private func confirmDiscard() -> Bool {
         let alert = NSAlert()
         alert.messageText = "Discard unsaved changes?"
         alert.informativeText = "Your changes to this text file have not been saved."
         alert.addButton(withTitle: "Keep Editing")
         alert.addButton(withTitle: "Discard Changes")
+        // Keep the synchronous transition guard while giving the alert an explicit owner.
+        // Child ordering keeps it above a floating Pad without changing either window's level.
+        let parent = dialogParent
+        parent?.addChildWindow(alert.window, ordered: .above)
+        defer { parent?.removeChildWindow(alert.window) }
+        NSApp.activate()
         return alert.runModal() == .alertSecondButtonReturn
     }
 }

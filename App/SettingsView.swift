@@ -18,13 +18,12 @@ struct SettingsView: View {
         .tint(settings.accentColor)
         .background(WindowReader { window in
             settingsWindow = window
-            #if DEBUG
-            window.level = .normal
-            #else
-            window.level = .floating
-            #endif
+            window.level = document.floating ? .floating : .normal
             document.settingsPresented = true
         })
+        .onChange(of: document.floating) { _, floating in
+            settingsWindow?.level = floating ? .floating : .normal
+        }
         .onAppear {
             document.settingsPresented = true
             document.isActive = false
@@ -67,6 +66,7 @@ struct SettingsView: View {
                     .disabled(login.updating)
                 if login.status == .requiresApproval { Button("Allow in Login Items…") { login.openSystemSettings() } }
                 if let error = login.error { Text(error).foregroundStyle(.red) }
+                Toggle("Always on top", isOn: $document.floating)
                 Toggle("Show in Dock", isOn: $settings.showInDock)
                     .accessibilityIdentifier("showInDock")
                     .disabled(settings.showInDock && !settings.menuBarItem && shortcut == nil)
@@ -79,6 +79,9 @@ struct SettingsView: View {
                 }
             }
             Section("Appearance") {
+                Picker("Appearance", selection: $settings.appearance) {
+                    ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0) }
+                }
                 Picker("Accent", selection: $settings.accent) {
                     ForEach(AccentChoice.allCases) { Text($0.title).tag($0) }
                 }
@@ -86,25 +89,11 @@ struct SettingsView: View {
                     ColorPicker("Accent color", selection: Binding(get: { settings.accentColor }, set: { settings.setCustomAccent($0) }), supportsOpacity: false)
                 }
                 LabeledContent("Menu bar icon") {
-                    Menu {
-                        ForEach(MenuBarIcon.allCases) { icon in
-                            Button { settings.menuBarIcon = icon } label: {
-                                icon.image.accessibilityLabel(icon.title)
-                            }
-                        }
-                    } label: {
-                        settings.menuBarIcon.image
-                    }
-                    .menuStyle(.button)
-                    .menuIndicator(.visible)
-                    .buttonStyle(.borderless)
-                    .tint(.primary)
-                    .fixedSize()
-                    .accessibilityLabel("Menu bar icon")
-                    .accessibilityValue(settings.menuBarIcon.title)
+                    MenuBarIconPicker(selection: $settings.menuBarIcon)
+                        .fixedSize()
+                        .accessibilityLabel("Menu bar icon")
                 }
                 .disabled(!settings.menuBarItem)
-                Toggle("Always on top", isOn: $document.floating)
             }
             Section("About") {
                 LabeledContent("Version", value: "\(Bundle.main.shortVersion) (\(Bundle.main.buildNumber))")
@@ -128,7 +117,7 @@ struct SettingsView: View {
                 Toggle("Save when Pad closes", isOn: $document.saveAutomatically)
                 LabeledContent("Save to") {
                     Text(document.folder.lastPathComponent).foregroundStyle(.secondary).lineLimit(1).help(document.folder.path)
-                    Button("Choose…") { Task { await document.chooseFolder() } }
+                    Button("Choose…") { Task { await document.chooseFolder(parent: settingsWindow) } }
                 }
                 if !document.isDefaultFolder { Button("Use Downloads") { document.useDownloads() } }
                 Picker("Default format", selection: $document.format) {
@@ -181,8 +170,19 @@ struct SettingsView: View {
                 }
                 .shortcutValidation { document.editingShortcuts.validateGlobal($0) }
             }
-            Section("While Editing") {
+            Section {
                 EditingShortcutSettings(shortcuts: document.editingShortcuts)
+            } header: {
+                Text("While Editing")
+            } footer: {
+                VStack(alignment: .trailing, spacing: 8) {
+                    if let error = document.editingShortcuts.error {
+                        Text(error).foregroundStyle(.red).font(.caption)
+                    }
+                    Button("Restore Defaults") { document.editingShortcuts.restoreDefaults() }
+                        .disabled(document.editingShortcuts.isDefault)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }.formStyle(.grouped)
     }

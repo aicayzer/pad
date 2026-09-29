@@ -13,10 +13,5 @@ struct EditingShortcutSettings: View {
             .shortcutValidation { shortcuts.validate($0, for: action) }
             .accessibilityIdentifier("editingShortcut.\(action.rawValue)")
         }
-        Button("Restore Defaults") { shortcuts.restoreDefaults() }
-            .disabled(shortcuts.isDefault)
-        if let error = shortcuts.error {
-            Text(error).foregroundStyle(.red).font(.caption)
-        }
     }
 }
