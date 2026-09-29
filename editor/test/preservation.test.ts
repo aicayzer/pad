@@ -61,3 +61,30 @@ test("noncanonical supported Markdown stays formatted and unchanged until edited
   expect(changes.at(-1)?.generation).toBe(5);
   root.remove();
 });
+
+test("TOML frontmatter does not swallow body text in the same CommonMark paragraph", async () => {
+  const header = '+++\ntitle = "Draft"\n+++';
+  const body = "Body immediately after the header";
+  const input = `${header}\n${body}\n\nLater paragraph\n`;
+  const result = await withEditor(input, (editor) => {
+    const view = editor.ctx.get(editorViewCtx);
+    expect(view.dom.textContent).toContain(body);
+    view.dispatch(
+      view.state.tr.insertText(" edited", view.state.doc.content.size - 1),
+    );
+    return serialize(editor.ctx);
+  });
+  expect(result).toContain(header);
+  expect(result).toContain(body);
+  expect(result).toContain("Later paragraph edited");
+  expect(await roundTrip(result)).toBe(result);
+});
+
+test("frontmatter requires matching opening and closing delimiters", async () => {
+  await withEditor("---\ntitle: Draft\n+++\n\nBody\n", (editor) => {
+    const view = editor.ctx.get(editorViewCtx);
+    expect(view.dom.querySelector(".literal-markdown")).toBeNull();
+    expect(view.dom.textContent).toContain("title: Draft");
+    expect(view.dom.textContent).toContain("Body");
+  });
+});

@@ -338,7 +338,7 @@ final class PadUITests: XCTestCase {
         let settings = app.windows["com_apple_SwiftUI_Settings_window"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
         selectTab("General", in: settings)
-        let appearance = settings.popUpButtons["Appearance"].firstMatch
+        let appearance = settings.popUpButtons["appearance"].firstMatch
         XCTAssertTrue(appearance.waitForExistence(timeout: 5), settings.debugDescription)
         let originalAppearance = try XCTUnwrap(appearance.value as? String)
         XCTAssertTrue(["System", "Light", "Dark"].contains(originalAppearance))
@@ -359,7 +359,7 @@ final class PadUITests: XCTestCase {
             attach(settings.screenshot(), name: "Settings General \(mode)")
             selectTab("Files", in: settings)
             XCTAssertTrue(settings.staticTexts["Automatic saving"].firstMatch.waitForExistence(timeout: 5))
-            XCTAssertTrue(settings.popUpButtons["Scratch lifetime"].firstMatch.isEnabled)
+            XCTAssertTrue(settings.popUpButtons["scratchLifetime"].firstMatch.isEnabled)
             attach(settings.screenshot(), name: "Settings Files \(mode)")
             selectTab("Shortcuts", in: settings)
             XCTAssertTrue(settings.staticTexts["Show or hide PadPad Dev"].firstMatch.waitForExistence(timeout: 5))
@@ -418,6 +418,108 @@ final class PadUITests: XCTestCase {
         XCTAssertEqual(process.activationPolicy, .accessory)
         expectValue("Menu bar", in: access)
         attach(settings.screenshot(), name: "Settings reopened with menu bar access unchanged")
+    }
+
+    func testMenuBarOnlyFloatingStartupStaysOutOfRunningDockItems() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-pad.format", "txt", "-pad.saveAutomatically", "NO", "-pad.floating", "YES",
+                               "-showInDock", "NO", "-menuBarItem", "YES", "-pad.editingShortcuts", "invalid",
+                               "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":11,\"carbonModifiers\":6400}""#]
+        app.launch()
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        let testBundle = try XCTUnwrap(Bundle(for: Self.self).bundleIdentifier)
+        XCTAssertTrue(testBundle.hasSuffix(".uitests"))
+        let target = String(testBundle.dropLast(".uitests".count))
+        let process = try XCTUnwrap(NSRunningApplication.runningApplications(withBundleIdentifier: target).first)
+        let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
+        let targetName = try XCTUnwrap(process.localizedName)
+        let matchingDockItems = dock.descendants(matching: .dockItem).matching(NSPredicate(format: "label == %@", targetName))
+
+        func checkDock(_ stage: String) {
+            let accessory = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.accessory.rawValue),
+                object: process)
+            XCTAssertEqual(XCTWaiter.wait(for: [accessory], timeout: 5), .completed, stage)
+            let preferences = UserDefaults(suiteName: "com.apple.dock")
+            func recorded(_ key: String) -> Bool {
+                let tiles = preferences?.array(forKey: key) as? [[String: Any]] ?? []
+                return tiles.contains { tile in
+                    let data = tile["tile-data"] as? [String: Any] ?? [:]
+                    return data["bundle-identifier"] as? String == target || data["file-label"] as? String == targetName
+                }
+            }
+            let pinned = recorded("persistent-apps")
+            let recent = recorded("recent-apps")
+            if !pinned && !recent {
+                let absent = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 0"), object: matchingDockItems)
+                XCTAssertEqual(XCTWaiter.wait(for: [absent], timeout: 5), .completed,
+                               "Unexpected unpinned application Dock item at \(stage)")
+            }
+            let details = "Stage: \(stage)\nActivation policy: \(process.activationPolicy.rawValue) (accessory expected)\nPinned: \(pinned)\nRecent: \(recent)\nExact application-name items: \(matchingDockItems.count)\n" +
+                matchingDockItems.allElementsBoundByIndex.map { $0.debugDescription }.joined(separator: "\n")
+            let evidence = XCTAttachment(string: details)
+            evidence.name = "Dock classification - \(stage)"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            attach(XCUIScreen.main.screenshot(), name: "Menu bar startup - \(stage)")
+        }
+
+        checkDock("launch")
+        let draft = "Disposable menu bar floating startup draft"
+        app.typeText(draft)
+        expectValue(draft, in: editor)
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        finder.activate()
+        XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
+        let finderMenu = finder.menuBars.firstMatch
+        XCTAssertTrue(finderMenu.waitForExistence(timeout: 5))
+        let close = app.buttons["Close PadPad"].firstMatch
+        for iteration in 1...3 {
+            finderMenu.typeKey("b", modifierFlags: [.control, .option, .command])
+            let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"), object: close)
+            XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 5), .completed, app.debugDescription)
+            expectValue(draft, in: editor)
+            checkDock("shortcut opened \(iteration)")
+            finderMenu.typeKey("b", modifierFlags: [.control, .option, .command])
+            let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false OR hittable == false"), object: close)
+            XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, app.debugDescription)
+            XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
+            checkDock("shortcut hidden \(iteration)")
+        }
+        finderMenu.typeKey("b", modifierFlags: [.control, .option, .command])
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
+        selectTab("General", in: settings)
+        expectValue("Menu bar", in: settings.popUpButtons["appAccess"])
+        XCTAssertTrue(settings.staticTexts["Open at login"].firstMatch.exists)
+        XCTAssertTrue(settings.staticTexts["Always on top"].firstMatch.exists)
+        checkDock("Settings open")
+        selectTab("Shortcuts", in: settings)
+        expectValue("⌃⌥⌘B", in: settings.searchFields.firstMatch)
+        settings.buttons["_XCUI:CloseWindow"].click()
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).click()
+        expectValue(draft, in: editor)
+        checkDock("Settings returned to editor")
+        finder.activate()
+        XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
+        finderMenu.typeKey("b", modifierFlags: [.control, .option, .command])
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        checkDock("shortcut after Settings")
+
+        // Login registration is intentionally untouched. A real login launch requires separate verification.
+        app.terminate()
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "terminated == true"), object: process)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed)
+        let afterQuit = XCTAttachment(string: "Exact application-name Dock items after termination: \(matchingDockItems.count)\n" +
+            matchingDockItems.allElementsBoundByIndex.map { $0.debugDescription }.joined(separator: "\n"))
+        afterQuit.name = "Dock item persistence after app termination"
+        afterQuit.lifetime = .keepAlways
+        add(afterQuit)
     }
 
     private func launchPad(floating: Bool = false) -> XCUIApplication {

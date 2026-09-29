@@ -75,6 +75,30 @@ final class MarkdownUITests: XCTestCase {
         app.typeKey("s", modifierFlags: .command)
         waitForFile(saved, containing: "After Settings")
         attach(app.screenshot(), name: "Formatted Markdown retained after Settings")
+
+        let undoText = " Undoable addition"
+        app.typeText(undoText)
+        app.typeKey("s", modifierFlags: .command)
+        waitForFile(saved, containing: undoText)
+        app.typeKey("z", modifierFlags: .command)
+        app.typeKey("s", modifierFlags: .command)
+        let undone = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (try? String(contentsOf: saved, encoding: .utf8).contains(undoText)) == false
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [undone], timeout: 5), .completed)
+        app.typeKey("z", modifierFlags: [.command, .shift])
+        app.typeKey("s", modifierFlags: .command)
+        waitForFile(saved, containing: undoText)
+
+        app.typeKey(",", modifierFlags: .command)
+        settings.toolbars.buttons["General"].click()
+        let appearance = settings.popUpButtons["appearance"].firstMatch
+        let originalAppearance = try XCTUnwrap(appearance.value as? String)
+        appearance.click()
+        app.menuItems["Dark"].click()
+        attach(app.screenshot(), name: "Formatted editor and Settings in Dark appearance")
+        appearance.click()
+        app.menuItems[originalAppearance].click()
     }
 
     func testImmediateTypingSavingAndNewDocumentIsolation() throws {

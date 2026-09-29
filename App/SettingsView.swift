@@ -90,6 +90,7 @@ struct SettingsView: View {
                     ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0) }
                 }
                 .tint(.primary)
+                .accessibilityIdentifier("appearance")
                 Picker("Accent", selection: $settings.accent) {
                     ForEach(AccentChoice.allCases) { Text($0.title).tag($0) }
                 }
@@ -117,8 +118,9 @@ struct SettingsView: View {
                     }
                 }
                 .tint(.primary)
+                .accessibilityIdentifier("scratchLifetime")
                 Toggle("Automatic saving", isOn: $document.saveAutomatically)
-            } header: { Text("Scratch pad") } footer: {
+            } header: { Text("Scratch") } footer: {
                 Text(scratchExplanation)
             }
             Section {
@@ -136,10 +138,6 @@ struct SettingsView: View {
                     Button("Use Downloads") { document.useDownloads() }
                         .tint(.primary)
                 }
-            } header: { Text("New files") } footer: {
-                if let error = document.error { Text(error).foregroundStyle(.red) }
-            }
-            Section {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text("Filename").fixedSize()
@@ -153,7 +151,9 @@ struct SettingsView: View {
                     }
                     PadNameField(parts: $document.nameParts).frame(height: 26)
                 }
-            } header: { Text("Naming") }
+            } header: { Text("Files") } footer: {
+                if let error = document.error { Text(error).foregroundStyle(.red) }
+            }
         }.formStyle(.grouped)
     }
 

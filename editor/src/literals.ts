@@ -30,8 +30,9 @@ export const preserveLiterals = $remark(
   "preserveLiterals",
   () => () => (tree: Root, file: { value: unknown }) => {
     const source = String(file.value);
-    const frontmatter =
-      /^(?:---|\+\+\+)\r?\n[\s\S]*?\r?\n(?:---|\+\+\+)(?:\r?\n|$)/.exec(source);
+    const frontmatter = /^(---|\+\+\+)\r?\n[\s\S]*?\r?\n\1(?:\r?\n|$)/.exec(
+      source,
+    );
     const frontmatterEnd = frontmatter?.[0].length ?? 0;
     const blocks: RootContent[] = [];
     if (frontmatter)
@@ -43,7 +44,16 @@ export const preserveLiterals = $remark(
         blocks.push(node);
         continue;
       }
-      if (start < frontmatterEnd) continue;
+      if (start < frontmatterEnd) {
+        // TOML delimiters are ordinary paragraph text to CommonMark, so a
+        // paragraph may also contain body text immediately after the header.
+        if (end > frontmatterEnd)
+          blocks.push({
+            type: "padLiteral",
+            value: source.slice(frontmatterEnd, end),
+          });
+        continue;
+      }
       const raw = source.slice(start, end);
       const table = /^\s*\|?.*\|.*\r?\n\s*\|?\s*:?-{3,}/m.test(raw);
       const footnote = /\[\^[^\]]+\]/.test(raw);
