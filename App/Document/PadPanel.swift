@@ -71,14 +71,19 @@ final class PadPanel: NSPanel {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.editorFocusScheduled = false
-            guard self.isKeyWindow, self.isVisible, !self.files.settingsPresented,
-                  self.firstResponder === self.pendingEditorInput || self.firstResponder === self else { return }
+            guard self.isKeyWindow, self.isVisible, !self.files.settingsPresented else { return }
+            let awaitingEditor = self.firstResponder === self.pendingEditorInput || self.firstResponder === self
             if self.files.currentFormat == .md {
                 guard let editor = self.files.markdownEditor else { return }
+                let responder = self.firstResponder as? NSView
+                // Replacing the Markdown document keeps WebKit's responder but resets its DOM focus.
+                let editingMarkdown = responder === editor.webView || responder?.isDescendant(of: editor.webView) == true
+                guard awaitingEditor || editingMarkdown else { return }
                 editor.enqueue(self.pendingEditorInput.takeEvents())
                 return
             }
-            guard let content = self.contentView, let editor = self.editor(in: content), editor.isEditable else { return }
+            guard awaitingEditor, let content = self.contentView,
+                  let editor = self.editor(in: content), editor.isEditable else { return }
             self.makeFirstResponder(editor)
         }
     }

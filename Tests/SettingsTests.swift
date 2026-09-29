@@ -70,6 +70,33 @@ import Testing
         #expect(defaults.object(forKey: "menuBarItem") == nil)
     }
 
+    @Test func ordinaryLaunchesAreNotLoginLaunches() {
+        #expect(!LoginItemSettings.isLoginLaunch(nil))
+        let event = launchEvent()
+        #expect(!LoginItemSettings.isLoginLaunch(event))
+        event.setParam(NSAppleEventDescriptor(enumCode: 0), forKeyword: keyAEPropData)
+        #expect(!LoginItemSettings.isLoginLaunch(event))
+    }
+
+    @Test(arguments: [keyAELaunchedAsLogInItem, keyAELaunchedAsServiceItem])
+    func loginAndServiceLaunchEventsAreRecognized(_ launchCode: OSType) {
+        let event = launchEvent()
+        event.setParam(NSAppleEventDescriptor(enumCode: launchCode), forKeyword: keyAEPropData)
+        #expect(LoginItemSettings.isLoginLaunch(event))
+    }
+
+    @Test func launchMetadataOnOtherEventsDoesNotSuppressAnOrdinaryReopen() {
+        let event = launchEvent(id: kAEReopenApplication)
+        event.setParam(NSAppleEventDescriptor(enumCode: keyAELaunchedAsLogInItem), forKeyword: keyAEPropData)
+        #expect(!LoginItemSettings.isLoginLaunch(event))
+    }
+
+    private func launchEvent(id: AEEventID = kAEOpenApplication) -> NSAppleEventDescriptor {
+        NSAppleEventDescriptor(eventClass: kCoreEventClass, eventID: id, targetDescriptor: nil,
+                               returnID: AEReturnID(kAutoGenerateReturnID),
+                               transactionID: AETransactionID(kAnyTransactionID))
+    }
+
     @Test func systemAccentUsesMacOSColor() {
         let suite = "pad-settings-tests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
