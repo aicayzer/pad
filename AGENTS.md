@@ -2,6 +2,12 @@
 
 Pad is a native macOS app for editing individual text and Markdown files. It has no note library, CLI, updater, or integration with another app.
 
+## Product behavior
+
+- Scratch text is intentionally temporary, including clipboard cleanup. With automatic saving off, closing hides the scratch pad; reopening within its configured lifetime restores the text. Reopening after expiry starts empty, without a recovery archive or discard prompt. Do not discard scratch text immediately on close or focus loss.
+- Automatic saving and explicit Save preserve work as files. Scratch expiry must never delete saved files or silently discard edits to an opened file.
+- Markdown editing must display editable formatted content, not require users to work in source syntax. Plain text remains a separate supported format.
+
 ## Working conventions
 
 - American English in repository content. Short, scoped Conventional Commits.
