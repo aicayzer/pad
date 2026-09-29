@@ -24,8 +24,10 @@ struct PanelTests {
         let panel = try #require(NSApp.windows.compactMap { $0 as? PadPanel }.first {
             !initialWindows.contains(ObjectIdentifier($0))
         })
-        let settingsWindow = NSWindow(contentRect: NSRect(x: 150, y: 150, width: 460, height: 580),
-                                      styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        // The agent test host cannot claim foreground activation on an unattended runner.
+        // A nonactivating fixture exercises focus transfer; UI tests cover real Settings activation.
+        let settingsWindow = NSPanel(contentRect: NSRect(x: 150, y: 150, width: 460, height: 580),
+                                      styleMask: [.titled, .closable, .nonactivatingPanel], backing: .buffered, defer: false)
         settingsWindow.isReleasedWhenClosed = false
         defer {
             document.showSettings = {}
