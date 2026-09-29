@@ -51,7 +51,7 @@ struct PanelTests {
             panel.sendEvent(event)
         }
         let queuedAfterInput = panel.pendingEditorEventCount
-        try await eventually("initial editor focus") { panel.isKeyWindow && panel.firstResponder is NSTextView }
+        try await eventually("initial editor focus") { panel.isKeyWindow && panel.firstResponder is NSTextView && !(panel.firstResponder is MarkdownInputBuffer) }
         let editor = try #require(panel.firstResponder as? NSTextView)
         #expect(document.isActive)
         try await eventually("keystrokes before editor mount", diagnostics: {
@@ -86,7 +86,7 @@ struct PanelTests {
         try await eventually("return from settings") { panel.isKeyWindow && document.isActive && !document.settingsPresented }
         #expect(document.text == originalText)
         #expect(document.documentID == originalID)
-        try await eventually("editor focus after settings") { panel.firstResponder is NSTextView }
+        try await eventually("editor focus after settings") { panel.firstResponder is NSTextView && !(panel.firstResponder is MarkdownInputBuffer) }
         let returnedEditor = try #require(panel.firstResponder as? NSTextView)
         returnedEditor.insertText("\nStill here after Settings.", replacementRange: NSRange(location: returnedEditor.string.utf16.count, length: 0))
         try await eventually("text input after settings") { document.text.hasSuffix("Still here after Settings.") }

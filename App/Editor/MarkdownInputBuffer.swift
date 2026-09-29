@@ -31,9 +31,9 @@ final class MarkdownInputBuffer: NSTextView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func attach(to window: NSWindow) {
-        guard let content = window.contentView, superview !== content else { return }
+        guard let container = window.contentView?.superview, superview !== container else { return }
         removeFromSuperview()
-        content.addSubview(self)
+        container.addSubview(self)
     }
 
     override func resignFirstResponder() -> Bool {
