@@ -106,6 +106,43 @@ struct MarkdownBridgeTests {
         #expect(document.error == nil)
     }
 
+    @Test func queuedAndLiveKeystrokesKeepTheirOrderDuringFocusHandoff() async throws {
+        let suite = "pad-input-order-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let document = PadDocument(defaults: defaults, presentsWindow: false)
+        document.mountMarkdownEditor()
+        let editor = try #require(document.markdownEditor)
+        let window = PadPanel(files: document)
+        window.isReleasedWhenClosed = false
+        window.contentView = editor.webView
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+            // PadPanel.close performs document actions; this test owns only the window.
+        }
+        editor.load("", documentID: UUID())
+        try await ready(editor)
+        let focusDeadline = ContinuousClock.now + .seconds(5)
+        while !window.isKeyWindow, ContinuousClock.now < focusDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        try #require(window.isKeyWindow)
+        let queued = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .shift,
+                                                  timestamp: 1, windowNumber: window.windowNumber, context: nil,
+                                                  characters: "I", charactersIgnoringModifiers: "i", isARepeat: false, keyCode: 34))
+        let live = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                                                timestamp: 2, windowNumber: window.windowNumber, context: nil,
+                                                characters: "m", charactersIgnoringModifiers: "m", isARepeat: false, keyCode: 46))
+        editor.enqueue([queued])
+        // The second key arrives before the asynchronous JavaScript focus call returns.
+        window.sendEvent(live)
+        let captured = try await editor.snapshot()
+        #expect(captured?.trimmingCharacters(in: .whitespacesAndNewlines) == "Im")
+    }
+
     private func ready(_ editor: PadMarkdownEditorController) async throws {
         let deadline = ContinuousClock.now + .seconds(15)
         while !editor.isReady, ContinuousClock.now < deadline {

@@ -75,10 +75,8 @@ final class PadPanel: NSPanel {
             let awaitingEditor = self.firstResponder === self.pendingEditorInput || self.firstResponder === self
             if self.files.currentFormat == .md {
                 guard let editor = self.files.markdownEditor else { return }
-                let responder = self.firstResponder as? NSView
-                // Replacing the Markdown document keeps WebKit's responder but resets its DOM focus.
-                let editingMarkdown = responder === editor.webView || responder?.isDescendant(of: editor.webView) == true
-                guard awaitingEditor || editingMarkdown else { return }
+                // Replacing the document can temporarily buffer input while DOM focus catches up.
+                guard awaitingEditor || editor.ownsFirstResponder else { return }
                 editor.enqueue(self.pendingEditorInput.takeEvents())
                 return
             }
@@ -100,6 +98,12 @@ final class PadPanel: NSPanel {
             if let editor = editor(in: child) { return editor }
         }
         return nil
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if files.currentFormat == .md,
+           files.markdownEditor?.captureInputDuringFocus(event) == true { return }
+        super.sendEvent(event)
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {

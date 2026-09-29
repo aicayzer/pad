@@ -559,6 +559,48 @@ export class PadEditor {
     view.dispatch(tr);
   }
 
+  /** Buffered native typing follows the same input rules as direct typing. */
+  insertText(text: string, generation: number): void {
+    if (generation !== this.generation) throw new Error("Document changed");
+    const view = this.editor.ctx.get(editorViewCtx);
+    const { from, to } = view.state.selection;
+    const transaction = () => view.state.tr.insertText(text, from, to);
+    if (
+      !view.someProp("handleTextInput", (handler) =>
+        handler(view, from, to, text, transaction),
+      )
+    ) {
+      view.dispatch(transaction().scrollIntoView());
+    }
+  }
+
+  /** Let existing keymaps handle buffered editing commands before native fallback. */
+  keyDown(
+    key: string,
+    code: string,
+    metaKey: boolean,
+    ctrlKey: boolean,
+    altKey: boolean,
+    shiftKey: boolean,
+    generation: number,
+  ): boolean {
+    if (generation !== this.generation) throw new Error("Document changed");
+    const view = this.editor.ctx.get(editorViewCtx);
+    const event = new KeyboardEvent("keydown", {
+      key,
+      code,
+      metaKey,
+      ctrlKey,
+      altKey,
+      shiftKey,
+      bubbles: true,
+      cancelable: true,
+    });
+    return Boolean(
+      view.someProp("handleKeyDown", (handler) => handler(view, event)),
+    );
+  }
+
   focus(): void {
     this.editor.ctx.get(editorViewCtx).focus();
   }
