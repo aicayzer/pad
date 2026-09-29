@@ -17,7 +17,7 @@ enum PadReuse: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .alwaysNew: "Always new"
+        case .alwaysNew: "Every opening"
         case .fiveMinutes: "5 minutes"
         case .tenMinutes: "10 minutes"
         case .fifteenMinutes: "15 minutes"
@@ -40,11 +40,11 @@ enum PadError: LocalizedError {
         switch self {
         case .unsupported: "Choose a .txt or .md file."
         case .encoding: "This file is not UTF-8 text. It was not changed."
-        case .changed: "The file changed outside Pad. Use Save As to keep both versions."
+        case .changed: "The file changed outside PadPad. Use Save As to keep both versions."
         case .missingFolder: "The chosen folder is unavailable. Select it again in Files settings."
         case .invalidName: "Enter a filename without slashes, colons, or control characters. The name cannot be empty, . or .., or longer than 255 bytes including its extension."
         case .nameExists: "A file with that name already exists. Choose another name."
-        case .renamePermission: "Pad cannot rename this file in its folder. Use Save As to choose a new name and keep the original."
+        case .renamePermission: "PadPad cannot rename this file in its folder. Use Save As to choose a new name and keep the original."
         }
     }
 }
@@ -52,6 +52,7 @@ enum PadError: LocalizedError {
 @MainActor
 @Observable
 final class PadDocument {
+    @ObservationIgnored var appSettings: AppSettings?
     let editingShortcuts: EditingShortcuts
     var floating: Bool {
         didSet {
@@ -106,7 +107,12 @@ final class PadDocument {
     private var documentScope: URL?
     private var folderScope: URL?
     private var panel: PadPanel?
-    private var createdAt: Date?
+    private var dismissedAt: Date?
+    private var scratchFormat: PadFormat
+    private var snapshotApplied = false
+    private var editorLoadedSource = ""
+    private(set) var markdownEditor: PadMarkdownEditorController?
+    @ObservationIgnored var editorSnapshot: (@MainActor () async throws -> String?)?
     private var openedFromDisk = false
     private var pendingName: String?
     private var nextNumber: Int
@@ -161,7 +167,8 @@ final class PadDocument {
         let defaultFloating = true
         #endif
         floating = defaults.object(forKey: Self.floatingKey) == nil ? defaultFloating : defaults.bool(forKey: Self.floatingKey)
-        format = defaults.string(forKey: Self.formatKey).flatMap(PadFormat.init(rawValue:)) ?? .txt
+        format = defaults.string(forKey: Self.formatKey).flatMap(PadFormat.init(rawValue:)) ?? .md
+        scratchFormat = defaults.string(forKey: Self.formatKey).flatMap(PadFormat.init(rawValue:)) ?? .md
         saveAutomatically = defaults.object(forKey: Self.autoSaveKey) == nil ? true : defaults.bool(forKey: Self.autoSaveKey)
         reusePeriod = PadReuse(rawValue: defaults.object(forKey: Self.reuseKey) as? Int ?? 15) ?? .fifteenMinutes
         nameParts = defaults.data(forKey: Self.namePartsKey)
@@ -176,16 +183,81 @@ final class PadDocument {
         }
     }
 
+    var currentFormat: PadFormat { url.flatMap { PadFormat(rawValue: $0.pathExtension.lowercased()) } ?? scratchFormat }
+
     var isDirty: Bool { text != savedText }
     var isBusy: Bool { operation != nil }
     var isVisible: Bool { panel?.isVisible == true }
     var isDefaultFolder: Bool { defaults.data(forKey: Self.folderBookmarkKey) == nil }
     var editableName: String { url?.deletingPathExtension().lastPathComponent ?? pendingName ?? "" }
     var displayName: String {
-        url?.lastPathComponent ?? pendingName.map { "\($0).\(format.rawValue)" } ?? "Untitled"
+        url?.lastPathComponent ?? pendingName.map { "\($0).\(currentFormat.rawValue)" } ?? "Untitled"
     }
     var namePreview: String {
         (try? PadFilename.name(parts: nameParts, format: format, number: nextNumber)) ?? "Invalid filename"
+    }
+
+    func mountMarkdownEditor() {
+        guard currentFormat == .md, markdownEditor == nil else { return }
+        let editor = PadMarkdownEditorController()
+        editor.onChanged = { [weak self] markdown, id in
+            guard let self, self.documentID == id else { return }
+            self.text = markdown
+        }
+        editor.onError = { [weak self] error in self?.error = error.localizedDescription }
+        editor.onReady = { [weak self] in self?.panel?.requestEditorFocus() }
+        markdownEditor = editor
+        editorSnapshot = { [weak editor] in
+            guard let editor else { throw CocoaError(.coderReadCorrupt) }
+            return try await editor.snapshot()
+        }
+        editorLoadedSource = text
+        editor.load(text, documentID: documentID)
+    }
+
+    private func reloadEditor() {
+        editorLoadedSource = text
+        markdownEditor?.load(text, documentID: documentID)
+    }
+
+    private func captureLatestEditor() async -> Bool {
+        guard currentFormat == .md, let editorSnapshot else { return true }
+        let id = documentID
+        panel?.prepareMarkdownSnapshot()
+        do {
+            let latest = try await editorSnapshot()
+            guard id == documentID else { return false }
+            text = latest ?? editorLoadedSource
+            return true
+        } catch {
+            self.error = "Could not read the editor. Your document is still open. " + error.localizedDescription
+            show()
+            return false
+        }
+    }
+
+    // Web edits are asynchronous; hold document transitions until the final keystroke is read.
+    private func synchronizeEditorThen(_ action: @escaping @MainActor () -> Void) -> Bool {
+        guard !snapshotApplied, currentFormat == .md, editorSnapshot != nil else { return false }
+        guard !isBusy else { return true }
+        operation = .transition
+        Task {
+            let captured = await captureLatestEditor()
+            operation = nil
+            guard captured else { return }
+            snapshotApplied = true
+            defer { snapshotApplied = false }
+            action()
+        }
+        return true
+    }
+
+    func prepareToTerminate() async -> Bool {
+        guard !isBusy else { return false }
+        operation = .transition
+        let captured = await captureLatestEditor()
+        operation = nil
+        return captured && canTerminate()
     }
 
     func installShortcut() {
@@ -223,19 +295,21 @@ final class PadDocument {
     }
 
     func newFile(now: Date = .now) {
+        if synchronizeEditorThen({ self.newFile(now: now) }) { return }
         guard !isBusy else { return }
         operation = .transition
         defer { operation = nil }
         guard finishCurrent() else { return }
         resetDocument()
-        createdAt = now
+        dismissedAt = nil
         show()
     }
 
     func toggle(now: Date = .now) {
+        if synchronizeEditorThen({ self.toggle(now: now) }) { return }
         guard !isBusy else { return }
         if isVisible {
-            close()
+            close(now: now)
         } else if openedFromDisk || isReusable(at: now) {
             refreshCurrentFile()
             show()
@@ -258,12 +332,14 @@ final class PadDocument {
     }
 
     private func isReusable(at now: Date) -> Bool {
-        guard let createdAt, !openedFromDisk, reusePeriod != .alwaysNew else { return false }
-        return now.timeIntervalSince(createdAt) < TimeInterval(reusePeriod.rawValue * 60)
+        guard !openedFromDisk, reusePeriod != .alwaysNew else { return false }
+        guard let dismissedAt else { return true }
+        return now.timeIntervalSince(dismissedAt) < TimeInterval(reusePeriod.rawValue * 60)
     }
 
     private func resetDocument() {
         documentID = UUID()
+        scratchFormat = format
         documentScope?.stopAccessingSecurityScopedResource()
         documentScope = nil
         url = nil
@@ -272,15 +348,17 @@ final class PadDocument {
         savedText = ""
         error = nil
         notice = nil
-        createdAt = nil
+        dismissedAt = nil
         openedFromDisk = false
         pendingName = nil
+        reloadEditor()
     }
 
     func openPicker() async {
         guard !isBusy else { return }
         operation = .filePanel
         defer { operation = nil }
+        guard await captureLatestEditor() else { return }
         let chosen = if let selectOpenFile { await selectOpenFile() } else { await presentOpenPanel() }
         guard let chosen else { return }
         openDocument(chosen)
@@ -295,6 +373,7 @@ final class PadDocument {
     }
 
     func open(_ file: URL) {
+        if synchronizeEditorThen({ self.open(file) }) { return }
         guard !isBusy else { return }
         operation = .transition
         defer { operation = nil }
@@ -327,11 +406,12 @@ final class PadDocument {
             text = content
             savedText = content
             baseline = bytes
-            createdAt = nil
+            dismissedAt = nil
             openedFromDisk = true
             pendingName = nil
             error = nil
             notice = nil
+            reloadEditor()
             show()
         } catch {
             if accessing { file.stopAccessingSecurityScopedResource() }
@@ -352,6 +432,7 @@ final class PadDocument {
                 savedText = content
                 baseline = bytes
                 notice = nil
+                reloadEditor()
             }
             error = nil
         } catch {
@@ -361,6 +442,7 @@ final class PadDocument {
     }
 
     func save() {
+        if synchronizeEditorThen({ self.save() }) { return }
         guard !isBusy else { return }
         saveCurrent()
     }
@@ -379,7 +461,7 @@ final class PadDocument {
                 let bytes = Data(text.utf8)
                 let destination: URL
                 if let pendingName {
-                    destination = folder.appending(path: try PadFilename.filename(stem: pendingName, extension: format.rawValue))
+                    destination = folder.appending(path: try PadFilename.filename(stem: pendingName, extension: currentFormat.rawValue))
                     guard !FileManager.default.fileExists(atPath: destination.path) else { throw PadError.nameExists }
                     try bytes.write(to: destination, options: .withoutOverwriting)
                 } else {
@@ -404,16 +486,18 @@ final class PadDocument {
         guard !isBusy else { return }
         operation = .filePanel
         defer { operation = nil }
+        guard await captureLatestEditor() else { return }
+        let previousFormat = currentFormat
         let content = text
         let directory = url?.deletingLastPathComponent() ?? folder
         let suggestion: (name: String, number: Int?)
         do {
             if let url { suggestion = (url.lastPathComponent, nil) }
             else if let pendingName {
-                suggestion = (try PadFilename.filename(stem: pendingName, extension: format.rawValue), nil)
+                suggestion = (try PadFilename.filename(stem: pendingName, extension: currentFormat.rawValue), nil)
             } else {
                 let generated = try PadFilename.available(in: directory, parts: nameParts,
-                                                             format: format, number: nextNumber)
+                                                             format: currentFormat, number: nextNumber)
                 guard generated.number < Int.max else { throw PadError.invalidName }
                 suggestion = (generated.url.lastPathComponent, generated.number)
             }
@@ -442,6 +526,8 @@ final class PadDocument {
             pendingName = nil
             baseline = bytes
             savedText = content
+            // A retained web editor must follow native edits when Save As changes formats.
+            if currentFormat != previousFormat { reloadEditor() }
             if let number = suggestion.number, destination.lastPathComponent == suggestion.name {
                 advanceGeneratedNumber(after: number)
             }
@@ -465,6 +551,7 @@ final class PadDocument {
     }
 
     func share(from anchor: NSView? = nil) {
+        if synchronizeEditorThen({ self.share(from: anchor) }) { return }
         guard !isBusy, let view = anchor ?? panel?.contentView else { return }
         operation = .sharing
         do {
@@ -495,31 +582,33 @@ final class PadDocument {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let name: String
         if let url { name = url.lastPathComponent }
-        else if let pendingName { name = "\(pendingName).\(format.rawValue)" }
-        else { name = try PadFilename.name(parts: nameParts, format: format, number: nextNumber) }
+        else if let pendingName { name = "\(pendingName).\(currentFormat.rawValue)" }
+        else { name = try PadFilename.name(parts: nameParts, format: currentFormat, number: nextNumber) }
         let snapshot = directory.appending(path: name)
         try Data(text.utf8).write(to: snapshot, options: .atomic)
         return snapshot
     }
 
-    func close() {
+    func close(now: Date = .now) {
+        if synchronizeEditorThen({ self.close(now: now) }) { return }
         guard !isBusy else { return }
         operation = .transition
         defer { operation = nil }
-        guard finishCurrent() else { return }
+        guard finishCurrent(retainingScratch: true) else { return }
+        dismissedAt = now
         isActive = false
         panel?.orderOut(nil)
     }
 
     func lostFocus() {
         DispatchQueue.main.async { [weak self] in
-            guard let self, !self.isBusy, !self.settingsPresented,
+            guard let self, !self.isBusy, !self.settingsPresented, self.markdownEditor?.showingLink != true,
                   self.panel?.isVisible == true, self.panel?.isKeyWindow == false else { return }
             self.close()
         }
     }
 
-    private func finishCurrent() -> Bool {
+    private func finishCurrent(retainingScratch: Bool = false) -> Bool {
         guard isDirty else { return true }
         if saveAutomatically {
             saveCurrent()
@@ -528,8 +617,10 @@ final class PadDocument {
         if url != nil {
             guard discardChanges?() ?? confirmDiscard() else { return false }
         }
-        if url == nil { resetDocument() }
-        else { text = savedText }
+        if url == nil {
+            if !retainingScratch { resetDocument() }
+        }
+        else { text = savedText; reloadEditor() }
         return true
     }
 
@@ -548,7 +639,7 @@ final class PadDocument {
         operation = .transition
         defer { operation = nil }
         do {
-            let fileExtension = url?.pathExtension ?? format.rawValue
+            let fileExtension = url?.pathExtension ?? currentFormat.rawValue
             let stem = try PadFilename.validatedStem(input)
             let name = try PadFilename.filename(stem: stem, extension: fileExtension)
             if let source = url {
@@ -600,7 +691,7 @@ final class PadDocument {
     private func saveGeneratedFile(_ bytes: Data) throws -> URL {
         let now = Date.now
         while true {
-            let candidate = try PadFilename.available(in: folder, parts: nameParts, format: format,
+            let candidate = try PadFilename.available(in: folder, parts: nameParts, format: currentFormat,
                                                          now: now, number: nextNumber)
             guard candidate.number < Int.max else { throw PadError.invalidName }
             do {
@@ -619,10 +710,11 @@ final class PadDocument {
     }
 
     private func updateTitle() {
-        panel?.title = "Pad: \(displayName)"
+        panel?.title = "PadPad: \(displayName)"
     }
 
     private func show() {
+        dismissedAt = nil
         guard presentsWindow else { return }
         if panel == nil { panel = PadPanel(files: self) }
         updateTitle()

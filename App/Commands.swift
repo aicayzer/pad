@@ -4,7 +4,7 @@ struct AppCommands: Commands {
     let document: PadDocument
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Text File") { document.commandNew() }.keyboardShortcut(document.editingShortcuts.shortcut(for: .newFile)?.toSwiftUI)
+            Button("New Draft") { document.commandNew() }.keyboardShortcut(document.editingShortcuts.shortcut(for: .newFile)?.toSwiftUI)
             Button("Open File…") { Task { await document.openPicker() } }.keyboardShortcut(document.editingShortcuts.shortcut(for: .open)?.toSwiftUI)
         }
         CommandGroup(replacing: .saveItem) {

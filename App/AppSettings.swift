@@ -13,6 +13,9 @@ final class AppSettings {
     var accent: AccentChoice { didSet { defaults.set(accent.rawValue, forKey: "accent") } }
     var customAccent: String { didSet { defaults.set(customAccent, forKey: "customAccent") } }
     private(set) var activationPolicyError: String?
+    private(set) var isChangingActivationPolicy = false
+    @ObservationIgnored private var activationGeneration = 0
+    @ObservationIgnored private weak var activationWindow: NSWindow?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -22,6 +25,16 @@ final class AppSettings {
         appearance = AppearanceChoice(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
         accent = AccentChoice(rawValue: defaults.string(forKey: "accent") ?? "") ?? .standard
         customAccent = defaults.string(forKey: "customAccent") ?? "BEBAFC"
+    }
+
+    var access: AppAccess { AppAccess(showInDock: showInDock, menuBarItem: menuBarItem) }
+
+    func setAccess(_ access: AppAccess, hasGlobalShortcut: Bool) {
+        guard access != .shortcutOnly || hasGlobalShortcut else { return }
+        // Establish the menu entry point before hiding the Dock icon.
+        if access.menuBarItem { menuBarItem = true }
+        if showInDock != access.showInDock { showInDock = access.showInDock }
+        if !access.menuBarItem { menuBarItem = false }
     }
 
     var accentColor: Color {
@@ -42,12 +55,60 @@ final class AppSettings {
     func applyActivationPolicy() {
         let policy: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { activationPolicyError = nil; return }
-        let wasActive = NSApp.isActive
+        let keyWindow = NSApp.keyWindow ?? activationWindow
+        let restoreFocus = (NSApp.isActive || isChangingActivationPolicy) && keyWindow?.isVisible == true
+        activationGeneration += 1
+        let generation = activationGeneration
+        activationWindow = restoreFocus ? keyWindow : nil
+        isChangingActivationPolicy = restoreFocus
         let applied = NSApp.setActivationPolicy(policy)
-        // Changing policy schedules an activation yield; cancel it while Settings still has focus.
-        if applied && wasActive { NSApp.activate() }
         activationPolicyError = applied || NSApp.activationPolicy() == policy
             ? nil : "Could not update Dock visibility. Try changing the setting again."
+        guard applied, restoreFocus else {
+            isChangingActivationPolicy = false
+            activationWindow = nil
+            return
+        }
+        // AppKit yields activation after changing policy. Restore the user's window after that yield,
+        // without treating the intervening resignation as a departure from Settings.
+        DispatchQueue.main.async { [weak self, weak keyWindow] in
+            guard let self, self.activationGeneration == generation else { return }
+            if NSApp.activationPolicy() == policy, let keyWindow, keyWindow.isVisible {
+                NSApp.activate()
+                keyWindow.makeKeyAndOrderFront(nil)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.activationGeneration == generation else { return }
+                self.activationWindow = nil
+                self.isChangingActivationPolicy = false
+            }
+        }
+    }
+}
+
+enum AppAccess: String, Identifiable {
+    case dock, menuBar, both, shortcutOnly
+
+    static let visibleChoices: [AppAccess] = [.dock, .menuBar, .both]
+    var id: String { rawValue }
+    var showInDock: Bool { self == .dock || self == .both }
+    var menuBarItem: Bool { self == .menuBar || self == .both }
+    var title: String {
+        switch self {
+        case .dock: "Dock"
+        case .menuBar: "Menu bar"
+        case .both: "Dock and menu bar"
+        case .shortcutOnly: "Shortcut only"
+        }
+    }
+
+    init(showInDock: Bool, menuBarItem: Bool) {
+        switch (showInDock, menuBarItem) {
+        case (true, true): self = .both
+        case (true, false): self = .dock
+        case (false, true): self = .menuBar
+        case (false, false): self = .shortcutOnly
+        }
     }
 }
 
@@ -60,7 +121,7 @@ enum AccentChoice: String, CaseIterable, Identifiable {
 enum MenuBarIcon: String, CaseIterable, Identifiable {
     case mark, text, compose
     var id: String { rawValue }
-    var title: String { switch self { case .mark: "Pad"; case .text: "Text"; case .compose: "Compose" } }
+    var title: String { switch self { case .mark: "App icon"; case .text: "Text"; case .compose: "Compose" } }
     @ViewBuilder var image: some View {
         switch self {
         case .mark: Image("MenuBarIcon").renderingMode(.template).resizable().scaledToFit().frame(height: 13)

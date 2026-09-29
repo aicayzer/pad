@@ -8,7 +8,7 @@ enum EditingAction: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .newFile: "New Text File"
+        case .newFile: "New Draft"
         case .open: "Open File"
         case .save: "Save"
         case .saveAs: "Save As"
@@ -69,7 +69,7 @@ final class EditingShortcuts {
             return .disallow(reason: "This key is reserved for text editing or an app command.")
         }
         if globalShortcut() == shortcut {
-            return .disallow(reason: "This shortcut already shows or hides Pad.")
+            return .disallow(reason: "This shortcut already shows or hides PadPad.")
         }
         if let other = EditingAction.allCases.first(where: { $0 != action && shortcuts[$0] == shortcut }) {
             return .disallow(reason: "This shortcut is already used by \(other.title).")

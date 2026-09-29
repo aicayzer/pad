@@ -25,3 +25,8 @@ DEVELOPMENT_TEAM = $team
 PAD_DISTRIBUTION_SIGNING_STYLE = Automatic
 PAD_DISTRIBUTION_PROFILE =
 SETTINGS
+
+# Build the bundled offline editor on the ephemeral Cloud worker.
+export HOMEBREW_NO_AUTO_UPDATE=1
+command -v node >/dev/null || brew install node
+command -v pnpm >/dev/null || brew install pnpm

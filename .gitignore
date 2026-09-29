@@ -19,3 +19,6 @@ _ignore/
 *.key
 *.p8
 *.log
+
+editor/node_modules/
+editor/dist/

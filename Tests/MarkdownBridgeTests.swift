@@ -1,0 +1,116 @@
+import AppKit
+import Testing
+import WebKit
+@testable import Pad
+
+@MainActor
+@Suite(.serialized, .opensWindows)
+struct MarkdownBridgeTests {
+    @Test func sourcePreservationFormattingReplacementAndSnapshotFailure() async throws {
+        let editor = PadMarkdownEditorController()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 500, height: 400),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = editor.webView
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+            window.close()
+        }
+        var changes: [(String, UUID)] = []
+        editor.onChanged = { changes.append(($0, $1)) }
+        let first = UUID()
+        let original = "Original with **bold** and _italic_.\n"
+        editor.load(original, documentID: first)
+        try await ready(editor)
+        #expect(try await editor.snapshot() == nil)
+        let html = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').innerHTML") as? String
+        #expect(html?.contains("<strong>bold</strong>") == true)
+        #expect(html?.contains("<em>italic</em>") == true)
+
+        // Formatting is an actual editor transaction, not a native text-model simulation.
+        editor.format(.heading, argument: "2")
+        let edited = try await editor.snapshot()
+        #expect(edited?.hasPrefix("## Original") == true)
+        #expect(changes.last?.1 == first)
+
+        let replacement = UUID()
+        editor.load("Replacement", documentID: replacement)
+        #expect(try await editor.snapshot() == nil)
+        editor.format(.heading, argument: "3")
+        #expect(try await editor.snapshot()?.hasPrefix("### Replacement") == true)
+        #expect(changes.last?.1 == replacement)
+
+        // A broken bridge must never look like an unchanged document to a destructive operation.
+        _ = try await editor.webView.evaluateJavaScript("delete window.editor")
+        await #expect(throws: (any Error).self) {
+            _ = try await editor.snapshot()
+        }
+    }
+
+    @Test func saveAsFormatRoundTripReloadsNativeEditsIntoTheMountedEditor() async throws {
+        let suite = "pad-format-roundtrip-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let folder = FileManager.default.temporaryDirectory.appending(path: suite)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var destination = folder.appending(path: "plain.txt")
+        let document = PadDocument(defaults: defaults, defaultFolder: folder, presentsWindow: false,
+                                   copyPath: { _ in }, selectSaveFile: { _, _ in destination })
+        document.text = "Original **Markdown**"
+        document.mountMarkdownEditor()
+        let editor = try #require(document.markdownEditor)
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 500, height: 400),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = editor.webView
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+            window.close()
+            try? FileManager.default.removeItem(at: folder)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try await ready(editor)
+        await document.saveAs()
+        #expect(document.currentFormat == .txt)
+
+        document.text = "Native edits with **new bold**"
+        destination = folder.appending(path: "formatted.md")
+        await document.saveAs()
+        #expect(document.currentFormat == .md)
+        try await ready(editor)
+        #expect(try await editor.snapshot() == nil)
+        let html = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').innerHTML") as? String
+        #expect(html?.contains("<strong>new bold</strong>") == true)
+        #expect(html?.contains("Original") == false)
+
+        // An unchanged snapshot must preserve the newly loaded source rather than the old Markdown.
+        document.save()
+        try await settled(document)
+        #expect(document.text == "Native edits with **new bold**")
+        #expect(try String(contentsOf: destination, encoding: .utf8) == "Native edits with **new bold**")
+        editor.format(.heading, argument: "2")
+        document.save()
+        try await settled(document)
+        #expect(try String(contentsOf: destination, encoding: .utf8).hasPrefix("## Native edits"))
+    }
+
+    private func settled(_ document: PadDocument) async throws {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while document.isBusy, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(!document.isBusy, "The editor snapshot did not finish")
+        #expect(document.error == nil)
+    }
+
+    private func ready(_ editor: PadMarkdownEditorController) async throws {
+        let deadline = ContinuousClock.now + .seconds(15)
+        while !editor.isReady, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        try #require(editor.isReady, "The bundled Markdown editor did not become ready")
+    }
+}

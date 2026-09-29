@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings = AppSettings(defaults: defaults)
         document = PadDocument(defaults: defaults, presentsWindow: !Self.isTestHost)
         super.init()
+        document.appSettings = settings
         if Self.isTestHost { KeyboardShortcuts.isEnabled = false }
     }
 
@@ -43,6 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        document.canTerminate() ? .terminateNow : .terminateCancel
+        if document.editorSnapshot != nil {
+            Task { sender.reply(toApplicationShouldTerminate: await document.prepareToTerminate()) }
+            return .terminateLater
+        }
+        return document.canTerminate() ? .terminateNow : .terminateCancel
     }
 }
