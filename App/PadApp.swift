@@ -7,6 +7,7 @@ struct PadApp: App {
     var body: some Scene {
         Settings {
             SettingsView().environment(delegate.settings).environment(delegate.document)
+                .preferredColorScheme(delegate.settings.appearance.colorScheme)
         }
         .windowResizability(.contentSize)
         .commands { AppCommands(document: delegate.document) }

@@ -9,6 +9,7 @@ final class AppSettings {
     var showInDock: Bool { didSet { defaults.set(showInDock, forKey: "showInDock"); applyActivationPolicy() } }
     var menuBarItem: Bool { didSet { defaults.set(menuBarItem, forKey: "menuBarItem") } }
     var menuBarIcon: MenuBarIcon { didSet { defaults.set(menuBarIcon.rawValue, forKey: "menuBarIcon") } }
+    var appearance: AppearanceChoice { didSet { defaults.set(appearance.rawValue, forKey: "appearance"); applyAppearance() } }
     var accent: AccentChoice { didSet { defaults.set(accent.rawValue, forKey: "accent") } }
     var customAccent: String { didSet { defaults.set(customAccent, forKey: "customAccent") } }
     private(set) var activationPolicyError: String?
@@ -18,6 +19,7 @@ final class AppSettings {
         showInDock = defaults.object(forKey: "showInDock") == nil ? true : defaults.bool(forKey: "showInDock")
         menuBarItem = defaults.object(forKey: "menuBarItem") == nil ? true : defaults.bool(forKey: "menuBarItem")
         menuBarIcon = MenuBarIcon(rawValue: defaults.string(forKey: "menuBarIcon") ?? "") ?? .mark
+        appearance = AppearanceChoice(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
         accent = AccentChoice(rawValue: defaults.string(forKey: "accent") ?? "") ?? .standard
         customAccent = defaults.string(forKey: "customAccent") ?? "BEBAFC"
     }
@@ -31,6 +33,10 @@ final class AppSettings {
     func setCustomAccent(_ color: Color) {
         guard let color = NSColor(color).usingColorSpace(.sRGB) else { return }
         customAccent = String(format: "%02X%02X%02X", Int((color.redComponent * 255).rounded()), Int((color.greenComponent * 255).rounded()), Int((color.blueComponent * 255).rounded()))
+    }
+
+    func applyAppearance() {
+        NSApp.appearance = appearance.nativeAppearance
     }
 
     func applyActivationPolicy() {
@@ -61,5 +67,16 @@ enum MenuBarIcon: String, CaseIterable, Identifiable {
         case .text: Image(systemName: "text.alignleft")
         case .compose: Image(systemName: "square.and.pencil")
         }
+    }
+}
+
+
+enum AppearanceChoice: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var title: String { switch self { case .system: "System"; case .light: "Light"; case .dark: "Dark" } }
+    var colorScheme: ColorScheme? { switch self { case .system: nil; case .light: .light; case .dark: .dark } }
+    var nativeAppearance: NSAppearance? {
+        switch self { case .system: nil; case .light: NSAppearance(named: .aqua); case .dark: NSAppearance(named: .darkAqua) }
     }
 }

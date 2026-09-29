@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         guard !Self.isTestHost else { return }
+        settings.applyAppearance()
         settings.applyActivationPolicy()
     }
 
