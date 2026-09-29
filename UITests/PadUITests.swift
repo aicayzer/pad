@@ -70,6 +70,36 @@ final class PadUITests: XCTestCase {
         waitForExpectations(timeout: 5)
     }
 
+    func testFloatingFolderSheetCancellationAndMouseClose() {
+        let app = launchPad(floating: true)
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        let draft = "Disposable floating dialog draft"
+        app.typeText(draft)
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
+        selectTab("Files", in: settings)
+        settings.buttons["Choose…"].click()
+        let sheet = settings.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), app.debugDescription)
+        let cancel = sheet.buttons["CancelButton"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(cancel.isHittable, app.debugDescription)
+        attach(XCUIScreen.main.screenshot(), name: "Folder sheet above floating Settings and Pad")
+        cancel.click()
+        expectValue(draft, in: editor)
+        let close = app.buttons["Close Pad"].firstMatch
+        // Settings remains key: the first click must work on Pad's inactive toolbar.
+        XCTAssertTrue(close.isEnabled, app.debugDescription)
+        XCTAssertTrue(close.isHittable, app.debugDescription)
+        close.click()
+        let hidden = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false OR hittable == false"), object: close)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, app.debugDescription)
+    }
+
     func testGlobalShortcutOpensOverFinderAndReturnsFocus() {
         let app = launchPad()
         defer { app.terminate() }
@@ -107,7 +137,7 @@ final class PadUITests: XCTestCase {
     }
 
     func testCancelingNativeFilePanelsAndSharingPreservesScratch() {
-        let app = launchPad()
+        let app = launchPad(floating: true)
         defer { app.terminate() }
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
@@ -247,11 +277,11 @@ final class PadUITests: XCTestCase {
         attach(app.screenshot(), name: "Draft preserved through Dock visibility changes")
     }
 
-    private func launchPad() -> XCUIApplication {
+    private func launchPad(floating: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         // Launch overrides establish a deterministic initial state without changing saved values.
-        app.launchArguments = ["-pad.saveAutomatically", "NO", "-pad.floating", "NO",
+        app.launchArguments = ["-pad.saveAutomatically", "NO", "-pad.floating", floating ? "YES" : "NO",
                                "-showInDock", "YES", "-menuBarItem", "NO",
                                "-pad.editingShortcuts", "invalid",
                                "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#]
