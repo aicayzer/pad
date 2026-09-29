@@ -18,8 +18,8 @@ Requires macOS 27 or later. The beta is available to invited testers through Tes
 - Write in a compact, translucent window that stays close at hand.
 - Edit formatted Markdown with bold, italic, headings, lists, links, quotes and code, or work in plain text.
 - Open, rename, save, and share `.txt` and `.md` files.
-- Choose scratch writing or automatic saving, with configurable filenames.
-- Return to scratch text within your chosen time away, or start a fresh scratch pad. Temporary scratch text expires after that interval unless saved.
+- Keep temporary drafts or save automatically, with configurable filenames.
+- Return to a draft within your chosen time away, or start a fresh draft. Unsaved drafts expire after that interval unless saved.
 - Customize shortcuts, accent color, and Dock and menu bar visibility.
 
 ## A few shortcuts
@@ -27,7 +27,7 @@ Requires macOS 27 or later. The beta is available to invited testers through Tes
 | Shortcut | Action |
 | --- | --- |
 | ⇧⌥B | Show or hide PadPad from any app |
-| ⌘N | New scratch pad |
+| ⌘N | New draft |
 | ⌘O | Open a file |
 | ⌘S | Save |
 | ⇧⌘S | Save As |

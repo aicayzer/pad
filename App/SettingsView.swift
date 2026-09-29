@@ -112,16 +112,16 @@ struct SettingsView: View {
         @Bindable var document = document
         return Form {
             Section {
-                Picker("Scratch lifetime", selection: $document.reusePeriod) {
+                Toggle("Save automatically", isOn: $document.saveAutomatically)
+                Picker("Draft lifetime", selection: $document.reusePeriod) {
                     ForEach(PadReuse.allCases) { period in
                         Text(period.title).tag(period)
                     }
                 }
                 .tint(.primary)
-                .accessibilityIdentifier("scratchLifetime")
-                Toggle("Automatic saving", isOn: $document.saveAutomatically)
-            } header: { Text("Scratch") } footer: {
-                Text(scratchExplanation)
+                .accessibilityIdentifier("draftLifetime")
+            } header: { Text("Draft") } footer: {
+                Text(draftExplanation)
             }
             Section {
                 Picker("Default format", selection: $document.format) {
@@ -157,21 +157,21 @@ struct SettingsView: View {
         }.formStyle(.grouped)
     }
 
-    private var scratchExplanation: String {
+    private var draftExplanation: String {
         if document.saveAutomatically {
             return "Saves to a file when you close the pad or switch apps."
         }
         if document.reusePeriod == .alwaysNew {
-            return "Unsaved scratch text clears on the next opening."
+            return "Unsaved drafts clear on the next opening."
         }
-        return "Unsaved scratch text clears after \(document.reusePeriod.title) away."
+        return "Unsaved drafts clear after \(document.reusePeriod.title) away."
     }
 
     private var about: some View {
         Form {
             Section {
                 LabeledContent(Bundle.main.displayName, value: "\(Bundle.main.shortVersion) (\(Bundle.main.buildNumber))")
-                Text("A scratch pad for text and Markdown.")
+                Text("A place for text and Markdown.")
                     .foregroundStyle(.secondary)
             }
             Section {

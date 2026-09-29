@@ -38,7 +38,7 @@ final class PadUITests: XCTestCase {
         attach(settings.screenshot(), name: "Pad Settings General")
 
         selectTab("Files", in: settings)
-        XCTAssertTrue(settings.staticTexts["Automatic saving"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(settings.staticTexts["Save automatically"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         expectValue(original, in: editor)
         attach(settings.screenshot(), name: "Pad Settings Files")
 
@@ -267,7 +267,7 @@ final class PadUITests: XCTestCase {
         expectValue("Draft after custom shortcut", in: editor)
         app.typeKey("n", modifierFlags: .command)
         expectValue("", in: editor)
-        attach(app.screenshot(), name: "Restored New Scratch Pad shortcut")
+        attach(app.screenshot(), name: "Restored New Draft shortcut")
     }
 
     func testDockToggleKeepsSettingsAndDraftUsable() throws {
@@ -300,7 +300,7 @@ final class PadUITests: XCTestCase {
             object: process)
         XCTAssertEqual(XCTWaiter.wait(for: [accessory], timeout: 5), .completed)
         selectTab("Files", in: settings)
-        XCTAssertTrue(settings.staticTexts["Automatic saving"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(settings.staticTexts["Save automatically"].firstMatch.waitForExistence(timeout: 5))
         expectValue(draft, in: editor)
         selectTab("General", in: settings)
         attach(settings.screenshot(), name: "Settings remains usable without Dock icon")
@@ -358,14 +358,14 @@ final class PadUITests: XCTestCase {
             XCTAssertTrue(appearance.isEnabled)
             attach(settings.screenshot(), name: "Settings General \(mode)")
             selectTab("Files", in: settings)
-            XCTAssertTrue(settings.staticTexts["Automatic saving"].firstMatch.waitForExistence(timeout: 5))
-            XCTAssertTrue(settings.popUpButtons["scratchLifetime"].firstMatch.isEnabled)
+            XCTAssertTrue(settings.staticTexts["Save automatically"].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertTrue(settings.popUpButtons["draftLifetime"].firstMatch.isEnabled)
             attach(settings.screenshot(), name: "Settings Files \(mode)")
             selectTab("Shortcuts", in: settings)
             XCTAssertTrue(settings.staticTexts["Show or hide PadPad Dev"].firstMatch.waitForExistence(timeout: 5))
             attach(settings.screenshot(), name: "Settings Shortcuts \(mode)")
             selectTab("About", in: settings)
-            XCTAssertTrue(settings.staticTexts["A scratch pad for text and Markdown."].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertTrue(settings.staticTexts["A place for text and Markdown."].firstMatch.waitForExistence(timeout: 5))
             XCTAssertFalse(settings.staticTexts["Open at login"].firstMatch.exists)
             attach(settings.screenshot(), name: "Settings About \(mode)")
         }

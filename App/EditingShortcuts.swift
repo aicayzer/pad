@@ -8,7 +8,7 @@ enum EditingAction: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .newFile: "New Scratch Pad"
+        case .newFile: "New Draft"
         case .open: "Open File"
         case .save: "Save"
         case .saveAs: "Save As"
