@@ -6,7 +6,7 @@ import SwiftUI
 @Observable
 final class AppSettings {
     private let defaults: UserDefaults
-    var showInDock: Bool { didSet { defaults.set(showInDock, forKey: "showInDock"); applyActivationPolicy() } }
+    var showInDock: Bool { didSet { defaults.set(showInDock, forKey: "showInDock"); if !defersActivationPolicy { applyActivationPolicy() } } }
     var menuBarItem: Bool { didSet { defaults.set(menuBarItem, forKey: "menuBarItem") } }
     var menuBarIcon: MenuBarIcon { didSet { defaults.set(menuBarIcon.rawValue, forKey: "menuBarIcon") } }
     var appearance: AppearanceChoice { didSet { defaults.set(appearance.rawValue, forKey: "appearance"); applyAppearance() } }
@@ -16,6 +16,12 @@ final class AppSettings {
     private(set) var isChangingActivationPolicy = false
     @ObservationIgnored private var activationGeneration = 0
     @ObservationIgnored private weak var activationWindow: NSWindow?
+    @ObservationIgnored private var defersActivationPolicy = false
+    @ObservationIgnored private var activationObservers: [NSObjectProtocol] = []
+    @ObservationIgnored private var departureMonitor: Any?
+    @ObservationIgnored private var localDepartureMonitor: Any?
+    @ObservationIgnored private var activationCleanup: Task<Void, Never>?
+    @ObservationIgnored private var requestedReactivation = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -29,12 +35,24 @@ final class AppSettings {
 
     var access: AppAccess { AppAccess(showInDock: showInDock, menuBarItem: menuBarItem) }
 
-    func setAccess(_ access: AppAccess, hasGlobalShortcut: Bool) {
+    func setAccess(_ access: AppAccess, hasGlobalShortcut: Bool, from window: NSWindow? = nil) {
         guard access != .shortcutOnly || hasGlobalShortcut else { return }
+        cancelActivationTransition()
+        defersActivationPolicy = window != nil
         // Establish the menu entry point before hiding the Dock icon.
         if access.menuBarItem { menuBarItem = true }
         if showInDock != access.showInDock { showInDock = access.showInDock }
         if !access.menuBarItem { menuBarItem = false }
+        guard let window else { return }
+        let generation = activationGeneration
+        // Picker actions run inside menu tracking; wait for its activation restoration to finish.
+        RunLoop.main.perform(inModes: [.default]) { [weak self, weak window] in
+            MainActor.assumeIsolated {
+                guard let self, self.activationGeneration == generation else { return }
+                self.defersActivationPolicy = false
+                self.applyActivationPolicy(restoring: window)
+            }
+        }
     }
 
     var accentColor: Color {
@@ -52,38 +70,91 @@ final class AppSettings {
         NSApp.appearance = appearance.nativeAppearance
     }
 
-    func applyActivationPolicy() {
+    func applyActivationPolicy(restoring window: NSWindow? = nil) {
+        guard !defersActivationPolicy else { return }
         let policy: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { activationPolicyError = nil; return }
-        let keyWindow = NSApp.keyWindow ?? activationWindow
-        let restoreFocus = (NSApp.isActive || isChangingActivationPolicy) && keyWindow?.isVisible == true
-        activationGeneration += 1
-        let generation = activationGeneration
-        activationWindow = restoreFocus ? keyWindow : nil
-        isChangingActivationPolicy = restoreFocus
+        let restoreWindow = window ?? NSApp.keyWindow
+        cancelActivationTransition()
+        if NSApp.isActive, let restoreWindow, restoreWindow.isVisible {
+            beginActivationTransition(window: restoreWindow)
+        }
         let applied = NSApp.setActivationPolicy(policy)
         activationPolicyError = applied || NSApp.activationPolicy() == policy
             ? nil : "Could not update Dock visibility. Try changing the setting again."
-        guard applied, restoreFocus else {
-            isChangingActivationPolicy = false
-            activationWindow = nil
-            return
+        if !applied { cancelActivationTransition() }
+    }
+
+    private func beginActivationTransition(window: NSWindow) {
+        activationWindow = window
+        isChangingActivationPolicy = true
+        let generation = activationGeneration
+        let center = NotificationCenter.default
+        for name in [NSApplication.didResignActiveNotification, NSApplication.didBecomeActiveNotification,
+                     NSWindow.didBecomeKeyNotification, NSWindow.willCloseNotification] {
+            activationObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
+                let name = notification.name
+                let changedWindow = notification.object as? NSWindow
+                MainActor.assumeIsolated {
+                    guard let self, self.activationGeneration == generation else { return }
+                    self.activationChanged(name, window: changedWindow, generation: generation)
+                }
+            })
         }
-        // AppKit yields activation after changing policy. Restore the user's window after that yield,
-        // without treating the intervening resignation as a departure from Settings.
-        DispatchQueue.main.async { [weak self, weak keyWindow] in
+        // A deliberate switch or click elsewhere cancels restoration rather than stealing focus back.
+        departureMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cancelActivationTransition() }
+        }
+        localDepartureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated {
+                if event.type == .keyDown || event.window !== self?.activationWindow {
+                    self?.cancelActivationTransition()
+                }
+            }
+            return event
+        }
+        // This bounds observer lifetime only; it never retries activation or declares success.
+        activationCleanup = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(1)) } catch { return }
             guard let self, self.activationGeneration == generation else { return }
-            if NSApp.activationPolicy() == policy, let keyWindow, keyWindow.isVisible {
-                NSApp.activate()
-                keyWindow.makeKeyAndOrderFront(nil)
-            }
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.activationGeneration == generation else { return }
-                self.activationWindow = nil
-                self.isChangingActivationPolicy = false
-            }
+            self.cancelActivationTransition()
         }
     }
+
+    private func activationChanged(_ name: Notification.Name, window changedWindow: NSWindow?, generation: Int) {
+        guard let window = activationWindow, window.isVisible else { cancelActivationTransition(); return }
+        if name == NSWindow.willCloseNotification, changedWindow === window {
+            cancelActivationTransition()
+        } else if name == NSApplication.didResignActiveNotification, !requestedReactivation {
+            requestedReactivation = true
+            RunLoop.main.perform(inModes: [.default]) { [weak self, weak window] in
+                MainActor.assumeIsolated {
+                    guard let self, self.activationGeneration == generation, let window, window.isVisible else { return }
+                    NSApp.activate()
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
+        } else if requestedReactivation, NSApp.isActive, window.isKeyWindow {
+            cancelActivationTransition()
+        }
+    }
+
+    private func cancelActivationTransition() {
+        defersActivationPolicy = false
+        activationGeneration += 1
+        activationCleanup?.cancel()
+        activationCleanup = nil
+        activationObservers.forEach(NotificationCenter.default.removeObserver)
+        activationObservers.removeAll()
+        if let departureMonitor { NSEvent.removeMonitor(departureMonitor) }
+        if let localDepartureMonitor { NSEvent.removeMonitor(localDepartureMonitor) }
+        departureMonitor = nil
+        localDepartureMonitor = nil
+        activationWindow = nil
+        requestedReactivation = false
+        isChangingActivationPolicy = false
+    }
+
 }
 
 enum AppAccess: String, Identifiable {
