@@ -439,7 +439,7 @@ final class PadUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
         let editor = app.textViews.firstMatch
-        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(editor.exists, "Initial launch must keep the draft hidden")
         let testBundle = try XCTUnwrap(Bundle(for: Self.self).bundleIdentifier)
         XCTAssertTrue(testBundle.hasSuffix(".uitests"))
         let target = String(testBundle.dropLast(".uitests".count))
@@ -477,15 +477,20 @@ final class PadUITests: XCTestCase {
             attach(XCUIScreen.main.screenshot(), name: "Menu bar startup - \(stage)")
         }
 
-        checkDock("launch")
-        let draft = "Disposable menu bar floating startup draft"
-        app.typeText(draft)
-        expectValue(draft, in: editor)
+        checkDock("hidden launch")
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
         finder.activate()
         XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
         let finderMenu = finder.menuBars.firstMatch
         XCTAssertTrue(finderMenu.waitForExistence(timeout: 5))
+        finderMenu.typeKey("b", modifierFlags: [.control, .option, .command])
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        checkDock("first shortcut opening")
+        let draft = "Disposable menu bar floating startup draft"
+        app.typeText(draft)
+        expectValue(draft, in: editor)
+        finder.activate()
+        XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5))
         let close = app.buttons["Close PadPad"].firstMatch
         for iteration in 1...3 {
             finderMenu.typeKey("b", modifierFlags: [.control, .option, .command])
@@ -532,6 +537,46 @@ final class PadUITests: XCTestCase {
         add(afterQuit)
     }
 
+    func testSavedMenuBarAccessSurvivesColdLaunch() throws {
+        let app = launchPad(floating: true)
+        defer { app.terminate() }
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectTab("General", in: settings)
+        settings.popUpButtons["appAccess"].click()
+        app.menuItems["Menu bar"].click()
+        expectValue("Menu bar", in: settings.popUpButtons["appAccess"])
+        app.terminate()
+
+        // A stored preference must work without the launch overrides used by the other scenarios.
+        for key in ["-showInDock", "-menuBarItem"] {
+            if let index = app.launchArguments.firstIndex(of: key) {
+                app.launchArguments.removeSubrange(index...index + 1)
+            }
+        }
+        app.launch()
+        XCTAssertEqual(app.windows.count, 0, "Cold launch must not restore an editor or Settings window")
+        let bundleID = try XCTUnwrap(Bundle(for: Self.self).bundleIdentifier)
+        let process = try XCTUnwrap(NSRunningApplication.runningApplications(
+            withBundleIdentifier: String(bundleID.dropLast(".uitests".count))).first)
+        let accessory = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "activationPolicy == %d", NSApplication.ActivationPolicy.accessory.rawValue),
+            object: process)
+        XCTAssertEqual(XCTWaiter.wait(for: [accessory], timeout: 5), .completed)
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        finder.activate()
+        finder.menuBars.firstMatch.typeKey("p", modifierFlags: [.control, .option, .command, .shift])
+        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(process.activationPolicy, .accessory)
+        attach(app.screenshot(), name: "Stored menu bar access after cold launch and shortcut")
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectTab("General", in: settings)
+        settings.popUpButtons["appAccess"].click()
+        app.menuItems["Dock and menu bar"].click()
+    }
+
     private func launchPad(floating: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -541,6 +586,8 @@ final class PadUITests: XCTestCase {
                                "-pad.editingShortcuts", "invalid",
                                "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#]
         app.launch()
+        XCTAssertFalse(app.textViews.firstMatch.exists, "Initial launch must keep the draft hidden")
+        app.typeKey("n", modifierFlags: .command)
         return app
     }
 

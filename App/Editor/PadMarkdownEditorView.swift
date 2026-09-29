@@ -9,7 +9,6 @@ struct PadMarkdownEditorView: NSViewRepresentable {
 
 struct PadMarkdownToolbar: View {
     @Bindable var editor: PadMarkdownEditorController
-    @State private var linkURL = ""
 
     var body: some View {
         HStack(spacing: 3) {
@@ -41,14 +40,46 @@ struct PadMarkdownToolbar: View {
             .help("Code")
             .accessibilityLabel("Code")
             Button {
-                linkURL = ""
                 editor.showingLink = true
             } label: {
                 Image(systemName: "link").frame(width: 24, height: 24)
             }
-            .keyboardShortcut("k", modifiers: .command)
             .help("Link (⌘K)")
             .accessibilityLabel("Link")
+            Spacer(minLength: 0)
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.primary)
+        .tint(.primary)
+        .controlSize(.small)
+        .disabled(!editor.isReady)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Markdown formatting")
+    }
+
+    private func formatButton(_ title: String, image: String, command: PadMarkdownFormatCommand) -> some View {
+        Button { editor.format(command) } label: {
+            Image(systemName: image)
+                .frame(width: 24, height: 24)
+                .foregroundStyle(.primary)
+                .fontWeight(editor.activeMarks.contains(command.rawValue) ? .bold : .regular)
+        }
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityValue(editor.activeMarks.contains(command.rawValue) ? "On" : "Off")
+        .accessibilityAddTraits(editor.activeMarks.contains(command.rawValue) ? .isSelected : [])
+    }
+}
+
+// Keep the link anchor mounted even when the formatting row is hidden.
+struct PadMarkdownLinkPresenter: ViewModifier {
+    @Bindable var editor: PadMarkdownEditorController
+    @State private var linkURL = ""
+
+    func body(content: Content) -> some View {
+        content
             .onChange(of: editor.showingLink) { _, showing in
                 if showing { linkURL = "" }
             }
@@ -70,18 +101,11 @@ struct PadMarkdownToolbar: View {
                             .disabled(validLink == nil)
                     }
                 }
+                .foregroundStyle(.primary)
+                .tint(.primary)
                 .padding(12)
                 .frame(width: 300)
             }
-            Spacer(minLength: 0)
-        }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
-        .disabled(!editor.isReady)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Markdown formatting")
     }
 
     private var validLink: String? {
@@ -97,14 +121,4 @@ struct PadMarkdownToolbar: View {
         editor.showingLink = false
     }
 
-    private func formatButton(_ title: String, image: String, command: PadMarkdownFormatCommand) -> some View {
-        Button { editor.format(command) } label: {
-            Image(systemName: image)
-                .frame(width: 24, height: 24)
-                .foregroundStyle(editor.activeMarks.contains(command.rawValue) ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-        }
-        .help(title)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(editor.activeMarks.contains(command.rawValue) ? .isSelected : [])
-    }
 }

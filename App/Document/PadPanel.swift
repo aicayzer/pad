@@ -190,6 +190,7 @@ private struct PadView: View {
     @State private var renamedDocument: UUID?
     @FocusState private var editing: Bool
     @State private var shareAnchor = PadShareAnchor()
+    @State private var showingFormatting = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -232,6 +233,22 @@ private struct PadView: View {
                 if files.isDirty { Circle().frame(width: 6, height: 6).foregroundStyle(.secondary) }
                 Spacer()
                 HStack(spacing: 2) {
+                    if files.currentFormat == .md, let editor = files.markdownEditor {
+                        Button {
+                            showingFormatting.toggle()
+                            editor.focus()
+                        } label: {
+                            Image(systemName: "textformat").frame(width: 16)
+                        }
+                        .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
+                        .accessibilityLabel("Formatting")
+                        .accessibilityIdentifier("formattingToggle")
+                        .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
+                        .accessibilityAddTraits(showingFormatting ? .isSelected : [])
+                        .help(showingFormatting ? "Hide formatting" : "Show formatting")
+                        .disabled(!editor.isReady)
+                        .modifier(PadMarkdownLinkPresenter(editor: editor))
+                    }
                     actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
                         files.share(from: shareAnchor.view)
                     }
@@ -258,7 +275,9 @@ private struct PadView: View {
             VStack(spacing: 0) {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
-                        PadMarkdownToolbar(editor: editor)
+                        if showingFormatting {
+                            PadMarkdownToolbar(editor: editor)
+                        }
                         PadMarkdownEditorView(editor: editor)
                             .onChange(of: settings.accentColor, initial: true) {
                                 editor.accentOverride = NSColor(settings.accentColor)
@@ -330,12 +349,13 @@ private struct PadView: View {
 
 private struct PadToolbarButtonStyle: ButtonStyle {
     var primary = false
+    var selected = false
     @State private var hovered = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(primary ? .primary : .secondary)
+            .foregroundStyle(primary || selected ? .primary : .secondary)
             .frame(height: 16)
             .padding(.horizontal, primary ? 14 : 8)
             .padding(.vertical, 4)
