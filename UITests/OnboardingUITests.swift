@@ -84,11 +84,13 @@ final class OnboardingUITests: XCTestCase {
         summonIntroduction(app)
         attach(app.dialogs.firstMatch.screenshot(), name: "Native onboarding in Dark appearance")
         let skip = app.buttons["onboardingSkip"].firstMatch
+        app.typeKey(.tab, modifierFlags: [])
         for _ in 0..<5 {
-            if skip.debugDescription.contains("Keyboard Focused") { break }
+            if skip.debugDescription.components(separatedBy: .newlines).first?.contains("Keyboard Focused") == true { break }
             app.typeKey(.tab, modifierFlags: [])
         }
-        XCTAssertTrue(skip.debugDescription.contains("Keyboard Focused"), "Skip must be reachable by Tab")
+        XCTAssertTrue(skip.debugDescription.components(separatedBy: .newlines).first?.contains("Keyboard Focused") == true,
+                      "Skip must be reachable by Tab: \(skip.debugDescription)")
         app.typeKey(.space, modifierFlags: [])
         waitForMarkdownEditor(app)
         switchToText(app)

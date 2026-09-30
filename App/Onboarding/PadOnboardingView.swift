@@ -12,9 +12,7 @@ struct PadOnboardingView: View {
     @Environment(AppSettings.self) private var settings
     @FocusState private var focusedControl: Control?
 
-    private enum Control: Hashable {
-        case close, next, back, skip, done
-    }
+    private typealias Control = PadOnboarding.Control
 
     private var accentForeground: Color {
         guard let color = NSColor(settings.accentColor).usingColorSpace(.sRGB) else { return .black }
@@ -53,6 +51,10 @@ struct PadOnboardingView: View {
         .ignoresSafeArea()
         .defaultFocus($focusedControl, .next)
         .onAppear { focusedControl = .next }
+        .onChange(of: focusedControl, initial: true) {
+            onboarding.focusedControl = focusedControl
+        }
+        .onDisappear { onboarding.focusedControl = nil }
         .onChange(of: onboarding.stage) {
             focusedControl = onboarding.stage == .intro ? .next : (hasPracticed ? .done : .skip)
         }

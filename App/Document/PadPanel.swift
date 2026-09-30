@@ -54,12 +54,13 @@ final class PadPanel: NSPanel {
         // AppKit draws outside the window; a SwiftUI shadow gets clipped at the hosting bounds.
         hasShadow = true
         isMovableByWindowBackground = true
-        minSize = NSSize(width: 520, height: 320)
         contentView = NSHostingView(rootView: PadView(files: files, prepareTitleFocus: { [weak self] in
             guard let self else { return }
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
-        }).environment(files.appSettings ?? AppSettings()))
+        }).environment(files.appSettings ?? AppSettings())
+            // Hosting derives the native minimum from the content's constraints.
+            .frame(minWidth: 520, minHeight: 320))
         pendingEditorInput.attach(to: self)
         pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
@@ -135,7 +136,7 @@ final class PadPanel: NSPanel {
         guard files.onboarding.isPresented, event.type == .keyDown,
               event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty else { return false }
         let key = Int(event.keyCode)
-        guard [kVK_Return, kVK_LeftArrow, kVK_RightArrow].contains(key) else { return false }
+        guard [kVK_Return, kVK_LeftArrow, kVK_RightArrow, kVK_Space].contains(key) else { return false }
         guard !event.isARepeat else { return true }
         let shortcut = KeyboardShortcuts.getShortcut(for: .pad)
         // A configured bare navigation key belongs to the real global-shortcut
@@ -143,8 +144,21 @@ final class PadPanel: NSPanel {
         if shortcut?.modifiers.isEmpty == true,
            (key == kVK_Return && shortcut?.key == .return ||
             key == kVK_LeftArrow && shortcut?.key == .leftArrow ||
-            key == kVK_RightArrow && shortcut?.key == .rightArrow) { return true }
+            key == kVK_RightArrow && shortcut?.key == .rightArrow ||
+            key == kVK_Space && shortcut?.key == .space) { return true }
         switch key {
+        case kVK_Space:
+            // Editing-style focus keeps Tab navigation available independently of
+            // macOS's all-controls preference; Space activates that focused action.
+            switch files.onboarding.focusedControl {
+            case .close: files.close()
+            case .next: files.onboarding.startPractice()
+            case .back: files.onboarding.showIntroduction()
+            case .skip: files.finishOnboarding(includeExample: false)
+            case .done:
+                if files.onboarding.practiceCount > 0 { files.finishOnboarding(includeExample: true) }
+            case nil: return false
+            }
         case kVK_LeftArrow: files.onboarding.showIntroduction()
         case kVK_RightArrow: files.onboarding.startPractice()
         default:

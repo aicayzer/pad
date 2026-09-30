@@ -8,6 +8,12 @@ final class PadOnboarding {
         case intro, practice
     }
 
+    enum Control: Hashable {
+        case close, next, back, skip, done
+    }
+
+    @ObservationIgnored var focusedControl: Control?
+
     private let defaults: UserDefaults
     private static let completionKey = "pad.onboardingCompleted"
 

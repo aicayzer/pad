@@ -186,11 +186,15 @@ final class MarkdownUITests: XCTestCase {
 
         let window = app.dialogs.firstMatch
         let originalFrame = window.frame
-        let resizeHandle = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-            .withOffset(CGVector(dx: -2, dy: -2))
-        let narrowCorner = window.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: 518, dy: originalFrame.height - 2))
-        resizeHandle.press(forDuration: 0.1, thenDragTo: narrowCorner)
+        // Activate before dragging the outside resize edge of this nonactivating panel.
+        app.activate()
+        let resizeHandle = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: 1, dy: 0))
+        let narrowEdge = window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 521, dy: originalFrame.height / 2))
+        resizeHandle.hover()
+        resizeHandle.click(forDuration: 0.2, thenDragTo: narrowEdge,
+                           withVelocity: .slow, thenHoldForDuration: 0.2)
         XCTAssertLessThanOrEqual(window.frame.width, 540, "The window must reach its narrow layout")
 
         let overflow = app.menuButtons["formattingOverflow"].firstMatch
