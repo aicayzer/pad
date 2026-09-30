@@ -162,6 +162,18 @@ final class PadMarkdownEditorController: NSObject {
         return markdown
     }
 
+    func clipboardSnapshot() async throws -> PadClipboardContents {
+        let expectedGeneration = generation
+        _ = try await snapshot()
+        guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
+        let result = try await webView.evaluateJavaScript("window.editor.clipboard()")
+        guard expectedGeneration == generation else { throw PadMarkdownEditorError.documentChanged }
+        guard let payload = result as? [String: Any],
+              let text = payload["text"] as? String,
+              let html = payload["html"] as? String else { throw PadMarkdownEditorError.invalidResponse }
+        return PadClipboardContents(text: text, html: html)
+    }
+
     func focus() {
         guard allowsFocus, isReady, let window = webView.window, window.isKeyWindow,
               focusTask == nil, !inputBuffer.isComposing else { return }

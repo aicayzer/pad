@@ -39,12 +39,15 @@ import Testing
         let acceptedPaste = shortcuts.set(KeyboardShortcuts.Shortcut(.v, modifiers: [.command, .shift]), for: .newFile)
         let acceptedTyping = shortcuts.set(KeyboardShortcuts.Shortcut(.b), for: .newFile)
         let acceptedClose = shortcuts.set(KeyboardShortcuts.Shortcut(.w, modifiers: .command), for: .newFile)
+        let acceptedCopy = shortcuts.set(KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .shift]), for: .save)
+        #expect(acceptedCopy == false)
         #expect(acceptedPaste == false)
         #expect(acceptedTyping == false)
         #expect(acceptedClose == false)
         #expect(shortcuts.isDefault)
         #expect(shortcuts.validateGlobal(EditingAction.save.defaultShortcut) != .allow)
         #expect(shortcuts.validateGlobal(global) == .allow)
+        #expect(shortcuts.validateGlobal(.init(.c, modifiers: [.command, .shift])) != .allow)
     }
 
     @Test func restoreIsAtomicWhenGlobalNowUsesADefault() throws {
@@ -59,6 +62,21 @@ import Testing
         shortcuts.restoreDefaults()
         #expect(shortcuts.shortcut(for: .newFile) == replacement)
         #expect(shortcuts.error != nil)
+    }
+
+    @Test func existingCopyShortcutConflictsRemainAssigned() throws {
+        let name = "pad-copy-conflict-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let copy = KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .shift])
+        let original: [EditingAction: KeyboardShortcuts.Shortcut] = [.save: copy]
+        defaults.set(try JSONEncoder().encode(original), forKey: "pad.editingShortcuts")
+        let shortcuts = EditingShortcuts(defaults: defaults, globalShortcut: { nil })
+        #expect(shortcuts.shortcut(for: .save) == copy)
+        #expect(!shortcuts.copyAllShortcutAvailable)
+        #expect(shortcuts.set(nil, for: .save))
+        #expect(shortcuts.copyAllShortcutAvailable)
+        #expect(!EditingShortcuts(defaults: defaults, globalShortcut: { copy }).copyAllShortcutAvailable)
     }
 
     @Test func eventRoutingUsesCustomBindingAndIgnoresOldBinding() throws {

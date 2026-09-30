@@ -233,9 +233,15 @@ struct SettingsView: View {
                     if let error = document.editingShortcuts.error {
                         Text(error).foregroundStyle(.red).font(.caption)
                     }
-                    Button("Restore Defaults") { document.editingShortcuts.restoreDefaults() }
-                        .tint(.primary)
-                        .disabled(document.editingShortcuts.isDefault)
+                    HStack {
+                        if document.editingShortcuts.copyAllShortcutAvailable {
+                            Text("Copy All Contents: ⇧⌘C").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Restore Defaults") { document.editingShortcuts.restoreDefaults() }
+                            .tint(.primary)
+                            .disabled(document.editingShortcuts.isDefault)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }

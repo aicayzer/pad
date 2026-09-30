@@ -14,6 +14,13 @@ struct AppCommands: Commands {
                 .disabled(!document.isActive)
             Button("Share…") { document.share() }.disabled(!document.isActive)
         }
+        CommandGroup(after: .pasteboard) {
+            Button("Copy All Contents") { Task { await document.copyAllContents() } }
+                .keyboardShortcut(document.editingShortcuts.copyAllShortcutAvailable ? KeyboardShortcut("c", modifiers: [.command, .shift]) : nil)
+                .disabled(!document.isActive || document.isBusy || document.onboarding.isPresented)
+            Button("Copy as Markdown") { Task { await document.copyAllContents(asMarkdown: true) } }
+                .disabled(!document.isActive || document.isBusy || document.onboarding.isPresented || document.currentFormat != .md)
+        }
         CommandGroup(replacing: .help) {
             Button("Show PadPad Introduction") { Task { await document.restartOnboarding() } }
         }

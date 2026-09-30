@@ -8,6 +8,7 @@ declare global {
       load(markdown: string, generation: number): void;
       reload(markdown: string, generation: number): void;
       markdown(): string | null;
+      clipboard(): { text: string; html: string };
       format(command: FormatCommand, arg?: string | number): void;
       focus(): void;
       insertText(text: string, generation: number): boolean;
@@ -84,6 +85,7 @@ window.editor = {
   load: (markdown, generation) => editor.load(markdown, generation),
   reload: (markdown, generation) => editor.reload(markdown, generation),
   markdown: () => editor.markdown(),
+  clipboard: () => editor.clipboard(),
   format: (command, arg) => editor.format(command, arg),
   focus: () => editor.focus(),
   insertText: (text, generation) => editor.insertText(text, generation),

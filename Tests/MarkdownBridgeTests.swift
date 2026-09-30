@@ -97,6 +97,46 @@ struct MarkdownBridgeTests {
         #expect(try String(contentsOf: destination, encoding: .utf8).hasPrefix("## Native edits"))
     }
 
+    @Test func clipboardExportPreservesSelectionAndRejectsReplacedDocument() async throws {
+        let editor = PadMarkdownEditorController()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 500, height: 400),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = editor.webView
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        editor.load("**Bold** & plain", documentID: UUID())
+        try await ready(editor)
+        _ = try await editor.webView.evaluateJavaScript("""
+            (() => {
+                const text = document.querySelector('.ProseMirror strong').firstChild;
+                const range = document.createRange();
+                range.setStart(text, 1); range.setEnd(text, 3);
+                const selection = getSelection();
+                selection.removeAllRanges(); selection.addRange(range);
+            })()
+            """)
+        let selectionBefore = try await editor.webView.evaluateJavaScript("getSelection().toString()") as? String
+        let copied = try await editor.clipboardSnapshot()
+        #expect(copied.text == "Bold & plain")
+        #expect(copied.html?.contains("<strong>Bold</strong>") == true)
+        #expect(try await editor.webView.evaluateJavaScript("getSelection().toString()") as? String == selectionBefore)
+        #expect(try await editor.snapshot() == nil)
+        var started = false
+        let pending = Task {
+            started = true
+            return try await editor.clipboardSnapshot()
+        }
+        while !started { await Task.yield() }
+        editor.load("Replacement", documentID: UUID())
+        do {
+            _ = try await pending.value
+            Issue.record("A replaced document must not export stale contents")
+        } catch {
+            if case PadMarkdownEditorError.documentChanged = error {} else { Issue.record("Unexpected error: \(error)") }
+        }
+    }
+
     private func settled(_ document: PadDocument) async throws {
         let deadline = ContinuousClock.now + .seconds(5)
         while document.isBusy, ContinuousClock.now < deadline {

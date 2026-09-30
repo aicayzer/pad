@@ -265,6 +265,54 @@ final class MarkdownUITests: XCTestCase {
         }
     }
 
+    func testCopyAndCopyAllKeepReadableCharactersFormattingAndSelection() throws {
+        let previous = (NSPasteboard.general.pasteboardItems ?? []).map { original in
+            let copy = NSPasteboardItem()
+            for type in original.types {
+                if let data = original.data(forType: type) { copy.setData(data, forType: type) }
+            }
+            return copy
+        }
+        defer {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.writeObjects(previous)
+        }
+        let app = launchPad()
+        defer { app.terminate() }
+        waitForEditor(app)
+        let source = "it;s removed? & other chars\n\nAnother **bold** line; literal `&#x20;` and target"
+        let visible = "it;s removed? & other chars \n\nAnother bold line; literal &#x20; and target"
+        paste(source, into: app)
+        // Author a trailing space: Markdown parsing legitimately trims source whitespace.
+        app.typeKey(.upArrow, modifierFlags: .command)
+        app.typeKey(.rightArrow, modifierFlags: .command)
+        app.typeText(" ")
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey("c", modifierFlags: .command)
+        waitForClipboard(visible)
+        XCTAssertTrue(NSPasteboard.general.string(forType: .html)?.contains("<strong>bold</strong>") == true)
+
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeKey(.leftArrow, modifierFlags: [.option, .shift])
+        NSPasteboard.general.clearContents()
+        app.typeKey("c", modifierFlags: [.command, .shift])
+        waitForClipboard(visible)
+        XCTAssertTrue(NSPasteboard.general.string(forType: .html)?.contains("<strong>bold</strong>") == true)
+        app.typeText("replacement")
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey("c", modifierFlags: .command)
+        waitForClipboard(visible.replacingOccurrences(of: "target", with: "replacement"))
+        attach(app.dialogs.firstMatch.screenshot(), name: "Copy All retains formatting and the selected replacement range")
+    }
+
+    private func waitForClipboard(_ expected: String) {
+        let copied = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            NSPasteboard.general.string(forType: .string) == expected
+        }, object: nil)
+        _ = XCTWaiter.wait(for: [copied], timeout: 5)
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), expected)
+    }
+
     private func launchPad() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -51,6 +51,11 @@ final class EditingShortcuts {
 
     var isDefault: Bool { shortcuts == Self.standardShortcuts }
 
+    var copyAllShortcutAvailable: Bool {
+        let shortcut = KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .shift])
+        return globalShortcut() != shortcut && !shortcuts.values.contains(shortcut)
+    }
+
     func shortcut(for action: EditingAction) -> KeyboardShortcuts.Shortcut? { shortcuts[action] }
 
     func action(for event: NSEvent) -> EditingAction? {
@@ -78,6 +83,9 @@ final class EditingShortcuts {
     }
 
     func validateGlobal(_ shortcut: KeyboardShortcuts.Shortcut) -> KeyboardShortcuts.ValidationResult {
+        if shortcut == .init(.c, modifiers: [.command, .shift]) {
+            return .disallow(reason: "This shortcut copies all contents while editing.")
+        }
         if let action = EditingAction.allCases.first(where: { shortcuts[$0] == shortcut }) {
             return .disallow(reason: "This shortcut is already used by \(action.title).")
         }
