@@ -10,7 +10,9 @@ PadPad is a native macOS app for editing individual text and Markdown files. It 
 - Automatic saving and explicit Save preserve work as files. Scratch expiry must never delete saved files or silently discard edits to an opened file.
 - Markdown editing displays editable formatted content without automatic source-mode fallback. Preserve unsupported constructs as literal content and retain the exact source until edited. Plain text remains a separate supported format; no RTF or image management.
 - Obtain a current, document-scoped editor snapshot before saving, sharing, replacing, closing or quitting. Snapshot and save failures retain the document and show an error.
-- Onboarding and discarded-draft recovery are deferred; do not add an archive or retention mechanism implicitly.
+- Onboarding appears on the first intentional opening of an empty draft, never on background launch or file opening. Practice uses the configured global shortcut and waits for Continue or Return; replay preserves the current document.
+- The MD/TXT footer switches draft formats without losing source. Existing files switch through Save As and retain the original.
+- Discarded-draft recovery is deferred; do not add an archive or retention mechanism implicitly.
 
 ## Working conventions
 

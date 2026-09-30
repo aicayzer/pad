@@ -433,7 +433,7 @@ final class PadUITests: XCTestCase {
     func testMenuBarOnlyFloatingStartupStaysOutOfRunningDockItems() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-pad.format", "txt", "-pad.saveAutomatically", "NO", "-pad.floating", "YES",
+        app.launchArguments = ["-pad.onboardingCompleted", "YES", "-pad.format", "txt", "-pad.saveAutomatically", "NO", "-pad.floating", "YES",
                                "-showInDock", "NO", "-menuBarItem", "YES", "-pad.editingShortcuts", "invalid",
                                "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":11,\"carbonModifiers\":6400}""#]
         app.launch()
@@ -581,7 +581,7 @@ final class PadUITests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         // Launch overrides establish a deterministic initial state without changing saved values.
-        app.launchArguments = ["-pad.format", "txt", "-pad.saveAutomatically", "NO", "-pad.floating", floating ? "YES" : "NO",
+        app.launchArguments = ["-pad.onboardingCompleted", "YES", "-pad.format", "txt", "-pad.saveAutomatically", "NO", "-pad.floating", floating ? "YES" : "NO",
                                "-showInDock", "YES", "-menuBarItem", "NO",
                                "-pad.editingShortcuts", "invalid",
                                "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#]

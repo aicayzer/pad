@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 @MainActor
@@ -68,11 +69,13 @@ final class PadPanel: NSPanel {
     @objc private func applicationBecameActive() { requestEditorFocus() }
 
     func requestEditorFocus() {
+        guard !files.onboarding.isPresented else { return }
         guard !editorFocusScheduled else { return }
         editorFocusScheduled = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.editorFocusScheduled = false
+            guard !self.files.onboarding.isPresented else { return }
             guard self.isKeyWindow, self.isVisible, !self.files.settingsPresented else { return }
             guard !self.pendingEditorInput.isComposing else { return }
             let awaitingEditor = self.firstResponder === self.pendingEditorInput || self.firstResponder === self
@@ -96,6 +99,20 @@ final class PadPanel: NSPanel {
         editor.enqueueInputs(pendingEditorInput.takeInputs())
     }
 
+    func prepareOnboarding() {
+        pendingTitleInput.discardEvents()
+        pendingEditorInput.discardEvents()
+        makeFirstResponder(nil)
+    }
+
+    func resumeEditor() {
+        guard !files.onboarding.isPresented else { return }
+        pendingEditorInput.attach(to: self)
+        makeFirstResponder(pendingEditorInput)
+        files.isActive = true
+        requestEditorFocus()
+    }
+
     private func editor(in view: NSView) -> NSTextView? {
         if let editor = view as? NSTextView, !(editor is MarkdownInputBuffer), !editor.isFieldEditor { return editor }
         for child in view.subviews {
@@ -105,7 +122,7 @@ final class PadPanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
-        if files.currentFormat == .md, firstResponder !== pendingEditorInput,
+        if !files.onboarding.isPresented, files.currentFormat == .md, firstResponder !== pendingEditorInput,
            files.markdownEditor?.capturePendingInput(event) == true { return }
         super.sendEvent(event)
     }
@@ -113,6 +130,7 @@ final class PadPanel: NSPanel {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if let action = files.editingShortcuts.action(for: event) {
+            guard !files.onboarding.isPresented else { return true }
             switch action {
             case .newFile: files.commandNew()
             case .open: Task { await files.openPicker() }
@@ -152,6 +170,10 @@ final class PadPanel: NSPanel {
     override func becomeKey() {
         super.becomeKey()
         files.settingsPresented = false
+        guard !files.onboarding.isPresented else {
+            files.isActive = false
+            return
+        }
         if !(firstResponder is NSTextView), files.markdownEditor?.ownsFirstResponder != true {
             pendingEditorInput.attach(to: self)
             makeFirstResponder(pendingEditorInput)
@@ -191,6 +213,7 @@ final class PadPanel: NSPanel {
 private struct PadView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var files: PadDocument
     let prepareTitleFocus: () -> Void
     @State private var renaming = false
@@ -199,8 +222,43 @@ private struct PadView: View {
     @FocusState private var editing: Bool
     @State private var shareAnchor = PadShareAnchor()
     @State private var showingFormatting = false
+    @State private var shortcut = KeyboardShortcuts.getShortcut(for: .pad)
 
     var body: some View {
+        ZStack {
+            if files.onboarding.isPresented {
+                PadOnboardingView(onboarding: files.onboarding, shortcut: shortcut,
+                                  draftExplanation: onboardingDraftExplanation,
+                                  onContinue: { files.finishOnboarding(includeExample: true) },
+                                  onSkip: { files.finishOnboarding(includeExample: false) },
+                                  onClose: { files.close() })
+                    .transition(.opacity)
+            } else {
+                editorContent.transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: files.onboarding.isPresented)
+        .tint(settings.accentColor)
+        .onAppear {
+            let action = openSettings
+            files.showSettings = { action() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            shortcut = KeyboardShortcuts.getShortcut(for: .pad)
+        }
+        .onChange(of: files.onboarding.isPresented) { _, presented in
+            if presented { editing = false; renaming = false; showingFormatting = false }
+        }
+    }
+
+    private var onboardingDraftExplanation: String {
+        let lifetime = files.reusePeriod == .alwaysNew
+            ? "Unsaved drafts clear on the next opening."
+            : "Unsaved drafts clear after \(files.reusePeriod.title) away."
+        return lifetime + " Save automatically or Save keeps a file. Quitting clears unsaved drafts."
+    }
+
+    private var editorContent: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Button { files.close() } label: {
@@ -305,12 +363,23 @@ private struct PadView: View {
                         .focused($editing)
                         .padding(10)
                 }
-                Text(files.error ?? files.notice ?? " ")
-                    .foregroundStyle(files.error == nil ? Color.secondary : Color.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 8)
-                    .accessibilityHidden(files.error == nil && files.notice == nil)
+                HStack(alignment: .bottom, spacing: 12) {
+                    Text(files.error ?? files.notice ?? " ")
+                        .foregroundStyle(files.error == nil ? Color.secondary : Color.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityHidden(files.error == nil && files.notice == nil)
+                    Button(files.currentFormat.title) {
+                        Task { await files.toggleFormat() }
+                    }
+                    .buttonStyle(PadFormatButtonStyle())
+                    .accessibilityIdentifier("documentFormat")
+                    .accessibilityLabel(files.currentFormat == .md ? "Markdown" : "Plain text")
+                    .accessibilityValue(files.currentFormat.title)
+                    .help(files.currentFormat == .md ? "Switch to plain text" : "Switch to Markdown")
+                }
+                .padding(.leading, 18)
+                .padding(.trailing, 10)
+                .padding(.bottom, 8)
             }
             .background(Color(nsColor: .textBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 15))
@@ -327,6 +396,7 @@ private struct PadView: View {
             files.showSettings = { action() }
         }
         .onChange(of: files.documentID) { finishRename() }
+        .onChange(of: files.currentFormat) { showingFormatting = false }
         .onChange(of: files.isActive, initial: true) {
             if files.isActive {
                 if !renaming { editing = true }
@@ -352,6 +422,23 @@ private struct PadView: View {
         .buttonStyle(PadToolbarButtonStyle())
         .accessibilityLabel(label)
         .help(label)
+    }
+}
+
+private struct PadFormatButtonStyle: ButtonStyle {
+    @State private var hovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 24, minHeight: 16)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(Color.primary.opacity(hovered || configuration.isPressed ? 0.08 : 0),
+                        in: RoundedRectangle(cornerRadius: 5))
+            .contentShape(RoundedRectangle(cornerRadius: 5))
+            .onHover { hovered = $0 }
     }
 }
 

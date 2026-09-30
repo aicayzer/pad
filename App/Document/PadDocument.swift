@@ -54,6 +54,7 @@ enum PadError: LocalizedError {
 final class PadDocument {
     @ObservationIgnored var appSettings: AppSettings?
     let editingShortcuts: EditingShortcuts
+    let onboarding: PadOnboarding
     var floating: Bool {
         didSet {
             defaults.set(floating, forKey: Self.floatingKey)
@@ -156,6 +157,7 @@ final class PadDocument {
         self.noticeDuration = noticeDuration
         self.defaults = defaults
         editingShortcuts = EditingShortcuts(defaults: defaults)
+        onboarding = PadOnboarding(defaults: defaults)
         self.presentsWindow = presentsWindow
         self.copyPath = copyPath
         self.selectOpenFile = selectOpenFile
@@ -198,14 +200,20 @@ final class PadDocument {
     }
 
     func mountMarkdownEditor() {
-        guard currentFormat == .md, markdownEditor == nil else { return }
+        guard !onboarding.isPresented, currentFormat == .md, markdownEditor == nil else { return }
         let editor = PadMarkdownEditorController()
         editor.onChanged = { [weak self] markdown, id in
-            guard let self, self.documentID == id else { return }
+            guard let self, self.documentID == id, self.currentFormat == .md, !self.onboarding.isPresented else { return }
             self.text = markdown
         }
-        editor.onError = { [weak self] error in self?.error = error.localizedDescription }
-        editor.onReady = { [weak self] in self?.panel?.requestEditorFocus() }
+        editor.onError = { [weak self] error in
+            guard let self, self.currentFormat == .md, !self.onboarding.isPresented else { return }
+            self.error = error.localizedDescription
+        }
+        editor.onReady = { [weak self] in
+            guard let self, !self.onboarding.isPresented, self.currentFormat == .md else { return }
+            self.panel?.requestEditorFocus()
+        }
         markdownEditor = editor
         editorSnapshot = { [weak editor] in
             guard let editor else { throw CocoaError(.coderReadCorrupt) }
@@ -221,7 +229,7 @@ final class PadDocument {
     }
 
     private func captureLatestEditor() async -> Bool {
-        guard currentFormat == .md, let editorSnapshot else { return true }
+        guard !onboarding.isPresented, currentFormat == .md, let editorSnapshot else { return true }
         let id = documentID
         panel?.prepareMarkdownSnapshot()
         do {
@@ -231,7 +239,9 @@ final class PadDocument {
             return true
         } catch {
             self.error = "Could not read the editor. Your document is still open. " + error.localizedDescription
+            onboarding.dismiss()
             show()
+            if !isActive, !onboarding.isPresented { panel?.resumeEditor() }
             return false
         }
     }
@@ -261,7 +271,73 @@ final class PadDocument {
     }
 
     func installShortcut() {
-        KeyboardShortcuts.onKeyDown(for: .pad) { [weak self] in self?.toggle() }
+        KeyboardShortcuts.onKeyDown(for: .pad) { [weak self] in self?.handleGlobalShortcut() }
+    }
+
+    /// Rehearsal advances only on an actual registered global-shortcut event.
+    func handleGlobalShortcut() {
+        guard !isBusy else { return }
+        if onboarding.isPresented {
+            if onboarding.stage == .practice { onboarding.recordShortcut() }
+            show()
+        } else {
+            toggle()
+        }
+    }
+
+    func restartOnboarding() async {
+        guard !isBusy else { return }
+        operation = .transition
+        defer { operation = nil }
+        // A replay must retain the last keystroke without saving or replacing the document.
+        if !onboarding.isPresented {
+            guard await captureLatestEditor() else { return }
+        }
+        panel?.prepareOnboarding()
+        onboarding.begin(resetCompletion: true)
+        isActive = false
+        show()
+    }
+
+    func finishOnboarding(includeExample: Bool) {
+        guard !isBusy, onboarding.isPresented else { return }
+        if includeExample, isPristineScratch {
+            scratchFormat = .md
+            text = """
+            # A little room to think
+
+            Write a thought here. **Keep what matters.**
+
+            ## One small next step
+
+            - [ ] Write down what's on your mind
+            - [ ] Choose one thing to do next
+            - [ ] Save this file if you want to keep it
+
+            > Your shortcut brings this pad back whenever you need it.
+
+            """
+        }
+        onboarding.complete()
+        reloadEditor()
+        show()
+        panel?.resumeEditor()
+    }
+
+    private var isPristineScratch: Bool {
+        url == nil && text.isEmpty && savedText.isEmpty && pendingName == nil
+    }
+
+    private func presentOnboardingIfNeeded() -> Bool {
+        if onboarding.isPresented {
+            show()
+            return true
+        }
+        guard presentsWindow, isPristineScratch, error == nil, onboarding.beginIfNeeded() else { return false }
+        panel?.prepareOnboarding()
+        isActive = false
+        show()
+        return true
     }
 
     func chooseFolder(parent: NSWindow? = nil) async {
@@ -295,6 +371,8 @@ final class PadDocument {
     }
 
     func newFile(now: Date = .now) {
+        guard !isBusy else { return }
+        if onboarding.isPresented { show(); return }
         if synchronizeEditorThen({ self.newFile(now: now) }) { return }
         guard !isBusy else { return }
         operation = .transition
@@ -306,7 +384,10 @@ final class PadDocument {
     }
 
     func toggle(now: Date = .now) {
+        guard !isBusy else { return }
+        if onboarding.isPresented { show(); return }
         if synchronizeEditorThen({ self.toggle(now: now) }) { return }
+        if presentOnboardingIfNeeded() { return }
         guard !isBusy else { return }
         if isVisible {
             close(now: now)
@@ -320,6 +401,9 @@ final class PadDocument {
 
     func showCurrent(now: Date = .now) {
         guard !isBusy else { return }
+        if !onboarding.hasCompleted, !onboarding.isPresented,
+           synchronizeEditorThen({ self.showCurrent(now: now) }) { return }
+        if presentOnboardingIfNeeded() { return }
         if isVisible {
             show()
         } else {
@@ -328,6 +412,9 @@ final class PadDocument {
     }
 
     func commandNew(now: Date = .now) {
+        guard !isBusy else { return }
+        if !onboarding.isPresented, synchronizeEditorThen({ self.commandNew(now: now) }) { return }
+        if presentOnboardingIfNeeded() { return }
         newFile(now: now)
     }
 
@@ -381,14 +468,19 @@ final class PadDocument {
     }
 
     private func openDocument(_ file: URL) {
+        let leavingOnboarding = onboarding.isPresented
         guard ["txt", "md"].contains(file.pathExtension.lowercased()) else {
             error = PadError.unsupported.localizedDescription
+            onboarding.dismiss()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
             return
         }
         if file.standardizedFileURL == url?.standardizedFileURL {
+            onboarding.dismiss()
             refreshCurrentFile()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
             return
         }
         let accessing = file.startAccessingSecurityScopedResource()
@@ -397,6 +489,11 @@ final class PadDocument {
             guard let content = String(data: bytes, encoding: .utf8) else { throw PadError.encoding }
             guard finishCurrent() else {
                 if accessing { file.stopAccessingSecurityScopedResource() }
+                if leavingOnboarding {
+                    onboarding.dismiss()
+                    show()
+                    panel?.resumeEditor()
+                }
                 return
             }
             documentScope?.stopAccessingSecurityScopedResource()
@@ -408,15 +505,19 @@ final class PadDocument {
             baseline = bytes
             dismissedAt = nil
             openedFromDisk = true
+            onboarding.dismiss()
             pendingName = nil
             error = nil
             notice = nil
             reloadEditor()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
         } catch {
             if accessing { file.stopAccessingSecurityScopedResource() }
             self.error = error.localizedDescription
+            onboarding.dismiss()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
         }
     }
 
@@ -482,22 +583,47 @@ final class PadDocument {
         } catch { self.error = error.localizedDescription; notice = nil }
     }
 
-    func saveAs() async {
+    func toggleFormat() async {
+        guard !isBusy, !onboarding.isPresented else { return }
+        let target: PadFormat = currentFormat == .md ? .txt : .md
+        if url != nil {
+            await saveAs(targetFormat: target)
+            return
+        }
+        operation = .transition
+        defer { operation = nil }
+        guard await captureLatestEditor() else { return }
+        scratchFormat = target
+        // The source is deliberately unchanged. TXT shows Markdown's exact source bytes.
+        reloadEditor()
+        error = nil
+        notice = nil
+        updateTitle()
+        show()
+        panel?.resumeEditor()
+    }
+
+    func saveAs(targetFormat: PadFormat? = nil) async {
         guard !isBusy else { return }
         operation = .filePanel
         defer { operation = nil }
         guard await captureLatestEditor() else { return }
         let previousFormat = currentFormat
+        let saveFormat = targetFormat ?? currentFormat
+        let id = documentID
         let content = text
         let directory = url?.deletingLastPathComponent() ?? folder
         let suggestion: (name: String, number: Int?)
         do {
-            if let url { suggestion = (url.lastPathComponent, nil) }
-            else if let pendingName {
-                suggestion = (try PadFilename.filename(stem: pendingName, extension: currentFormat.rawValue), nil)
+            if let url {
+                let name = targetFormat == nil ? url.lastPathComponent
+                    : url.deletingPathExtension().appendingPathExtension(saveFormat.rawValue).lastPathComponent
+                suggestion = (name, nil)
+            } else if let pendingName {
+                suggestion = (try PadFilename.filename(stem: pendingName, extension: saveFormat.rawValue), nil)
             } else {
                 let generated = try PadFilename.available(in: directory, parts: nameParts,
-                                                             format: currentFormat, number: nextNumber)
+                                                             format: saveFormat, number: nextNumber)
                 guard generated.number < Int.max else { throw PadError.invalidName }
                 suggestion = (generated.url.lastPathComponent, generated.number)
             }
@@ -509,17 +635,21 @@ final class PadDocument {
         let destination = if let selectSaveFile {
             await selectSaveFile(directory, suggestion.name)
         } else {
-            await presentSavePanel(directory: directory, name: suggestion.name)
+            await presentSavePanel(directory: directory, name: suggestion.name, targetFormat: targetFormat)
         }
-        guard let destination else { return }
+        guard let destination, documentID == id else { return }
         let accessing = destination.startAccessingSecurityScopedResource()
         do {
+            if let targetFormat {
+                guard destination.pathExtension.lowercased() == targetFormat.rawValue else { throw PadError.unsupported }
+                guard !FileManager.default.fileExists(atPath: destination.path) else { throw PadError.nameExists }
+            }
             if destination.standardizedFileURL == url?.standardizedFileURL,
                try Data(contentsOf: destination) != baseline {
                 throw PadError.changed
             }
             let bytes = Data(content.utf8)
-            try bytes.write(to: destination, options: .atomic)
+            try bytes.write(to: destination, options: targetFormat == nil ? .atomic : .withoutOverwriting)
             documentScope?.stopAccessingSecurityScopedResource()
             documentScope = accessing ? destination : nil
             url = destination
@@ -527,7 +657,11 @@ final class PadDocument {
             baseline = bytes
             savedText = content
             // A retained web editor must follow native edits when Save As changes formats.
-            if currentFormat != previousFormat { reloadEditor() }
+            if currentFormat != previousFormat {
+                reloadEditor()
+                show()
+                panel?.resumeEditor()
+            }
             if let number = suggestion.number, destination.lastPathComponent == suggestion.name {
                 advanceGeneratedNumber(after: number)
             }
@@ -541,9 +675,14 @@ final class PadDocument {
         }
     }
 
-    private func presentSavePanel(directory: URL, name: String) async -> URL? {
+    private func presentSavePanel(directory: URL, name: String, targetFormat: PadFormat? = nil) async -> URL? {
         let picker = NSSavePanel()
         picker.allowedContentTypes = [.plainText, UTType(filenameExtension: "md") ?? .plainText]
+        if let targetFormat {
+            picker.allowedContentTypes = targetFormat == .md
+                ? [UTType(filenameExtension: "md") ?? .plainText] : [.plainText]
+            picker.allowsOtherFileTypes = false
+        }
         picker.directoryURL = directory
         picker.nameFieldStringValue = name
         guard await present(picker, parent: dialogParent) == .OK else { return nil }
@@ -590,11 +729,27 @@ final class PadDocument {
     }
 
     func close(now: Date = .now) {
+        guard !isBusy else { return }
+        if onboarding.isPresented {
+            let pristine = isPristineScratch
+            onboarding.dismiss()
+            if pristine {
+                isActive = false
+                dismissedAt = nil
+                panel?.orderOut(nil)
+                return
+            }
+            // Replaying the welcome does not exempt an existing draft from normal close rules.
+        }
         if synchronizeEditorThen({ self.close(now: now) }) { return }
         guard !isBusy else { return }
         operation = .transition
         defer { operation = nil }
-        guard finishCurrent(retainingScratch: true) else { return }
+        guard finishCurrent(retainingScratch: true) else {
+            show()
+            panel?.resumeEditor()
+            return
+        }
         dismissedAt = now
         isActive = false
         panel?.orderOut(nil)
@@ -602,7 +757,7 @@ final class PadDocument {
 
     func lostFocus() {
         DispatchQueue.main.async { [weak self] in
-            guard let self, !self.isBusy, !self.settingsPresented, self.markdownEditor?.showingLink != true,
+            guard let self, !self.onboarding.isPresented, !self.isBusy, !self.settingsPresented, self.markdownEditor?.showingLink != true,
                   self.panel?.isVisible == true, self.panel?.isKeyWindow == false else { return }
             self.close()
         }
@@ -715,6 +870,8 @@ final class PadDocument {
 
     private func show() {
         dismissedAt = nil
+        markdownEditor?.allowsFocus = !onboarding.isPresented && currentFormat == .md
+        if onboarding.isPresented { isActive = false }
         guard presentsWindow else { return }
         if panel == nil { panel = PadPanel(files: self) }
         updateTitle()

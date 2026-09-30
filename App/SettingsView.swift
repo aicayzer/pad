@@ -15,7 +15,8 @@ struct SettingsView: View {
             Tab("Shortcuts", systemImage: "keyboard") { shortcuts }
             Tab("About", systemImage: "info.circle") { about }
         }
-        .frame(width: 460, height: 580)
+        // Fits the tallest settings page while keeping tab changes still.
+        .frame(width: 460, height: 420)
         .tint(settings.accentColor)
         .background(WindowReader { window in
             settingsWindow = window
@@ -195,6 +196,19 @@ struct SettingsView: View {
                 Link("Source Code", destination: URL(string: "https://github.com/aicayzer/pad")!)
                 Link("Releases", destination: URL(string: "https://github.com/aicayzer/pad/releases")!)
                 Link("License", destination: URL(string: "https://github.com/aicayzer/pad/blob/main/LICENSE")!)
+            } footer: {
+                HStack {
+                    Spacer()
+                    Button("Reset onboarding") {
+                        Task {
+                            await document.restartOnboarding()
+                            if document.onboarding.isPresented { settingsWindow?.orderOut(nil) }
+                        }
+                    }
+                    .accessibilityIdentifier("resetOnboarding")
+                    .help("Replay the introduction without changing your settings or document")
+                }
+                .padding(.top, 8)
             }
             .tint(.primary)
         }.formStyle(.grouped)

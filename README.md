@@ -22,6 +22,10 @@ Requires macOS 27 or later. The beta is available to invited testers through Tes
 - Return to a draft within your chosen time away, or start a fresh draft. Unsaved drafts expire after that interval unless saved.
 - Customize shortcuts, accent color, and Dock and menu bar visibility.
 
+The first deliberate opening introduces PadPad and lets you practice your configured global shortcut. After it responds with Done, press Return or Continue to open a small editable Markdown draft. You can skip the introduction, or replay it from Settings → About → Reset onboarding without replacing your current document. Launching the app, including at login, keeps the editor hidden.
+
+The MD/TXT button at the bottom of the editor switches the current draft between formatted Markdown and plain-text source. For an existing file, it offers Save As with the new extension and keeps the original file.
+
 ## A few shortcuts
 
 | Shortcut | Action |

@@ -1,0 +1,293 @@
+import AppKit
+import XCTest
+
+@MainActor
+final class OnboardingUITests: XCTestCase {
+    func testFirstSummonPracticesGlobalShortcutWithoutAdvancingOnRepeat() throws {
+        let app = launchPad()
+        defer { app.terminate() }
+        summonIntroduction(app)
+        attach(app.dialogs.firstMatch.screenshot(), name: "First intentional summon introduces PadPad")
+
+        let start = app.buttons["onboardingStartPractice"].firstMatch
+        expectHittable(start)
+        app.typeKey(.return, modifierFlags: [])
+        let practice = element("onboardingPractice", in: app)
+        XCTAssertTrue(practice.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(element("onboardingDone", in: app).exists)
+        let shortcut = element("onboardingShortcut", in: app)
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(shortcut.label.contains("⌃⌥⇧⌘P") ||
+                      (shortcut.value as? String)?.contains("⌃⌥⇧⌘P") == true,
+                      "Practice must show the configured fixture chord: \(shortcut.debugDescription)")
+
+        pressGlobalShortcutFromFinder()
+        expectValue("Practiced 1 times", in: shortcut)
+        let done = element("onboardingDone", in: app)
+        XCTAssertTrue(done.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(practice.exists, "Practicing must leave the onboarding visible")
+        XCTAssertFalse(app.buttons["documentFormat"].exists, "The editor must not appear before Continue")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Real global shortcut acknowledged in native onboarding")
+
+        // A second global invocation must stay in practice, not open or dismiss the editor.
+        pressGlobalShortcutFromFinder()
+        expectValue("Practiced 2 times", in: shortcut)
+        XCTAssertTrue(done.exists, app.debugDescription)
+        XCTAssertTrue(practice.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons["documentFormat"].exists, app.debugDescription)
+        expectHittable(app.buttons["onboardingContinue"].firstMatch)
+        app.typeKey(.return, modifierFlags: [])
+        waitForMarkdownEditor(app)
+        XCTAssertFalse(practice.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons["Bold"].exists, "Formatting starts hidden")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Practice finishes in a real editable Markdown example")
+
+        switchToText(app)
+        let text = app.textViews.firstMatch
+        let source = try XCTUnwrap(text.value as? String)
+        XCTAssertTrue(source.hasPrefix("# "), "The example should have a Markdown heading: \(source)")
+        XCTAssertTrue(source.contains("- "), "The example should include a useful action list: \(source)")
+        text.click()
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText("\nNative shortcut practice verified")
+        expectTextContaining("Native shortcut practice verified", in: text)
+    }
+
+    func testSkipAndFormatRoundTripRetainEditableMarkdownInDarkAppearance() throws {
+        let app = launchPad(appearance: "dark")
+        defer { app.terminate() }
+        summonIntroduction(app)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Native onboarding in Dark appearance")
+        app.typeKey(.tab, modifierFlags: [])
+        app.typeKey(.tab, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        waitForMarkdownEditor(app)
+        switchToText(app)
+
+        let text = app.textViews.firstMatch
+        let source = "# Disposable plan\n\nKeep **this exact sentence**.\n\n- Bring the draft\n- Agree the owner\n"
+        replaceText(source, in: text, app: app)
+        expectValue(source, in: text)
+        app.buttons["documentFormat"].click()
+        waitForMarkdownEditor(app)
+        XCTAssertFalse(app.buttons["Bold"].exists)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Plain source becomes editable formatted Markdown")
+
+        // Loading formatted content alone must retain the exact original source.
+        switchToText(app)
+        expectValue(source, in: app.textViews.firstMatch)
+        app.buttons["documentFormat"].click()
+        waitForMarkdownEditor(app)
+        let web = app.webViews.firstMatch
+        web.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).click()
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeKey(.return, modifierFlags: [])
+        app.typeText("Edited in the formatted surface")
+
+        switchToText(app)
+        expectTextContaining("Edited in the formatted surface", in: app.textViews.firstMatch)
+        let edited = try XCTUnwrap(app.textViews.firstMatch.value as? String)
+        XCTAssertTrue(edited.contains("# Disposable plan"), edited)
+        XCTAssertTrue(edited.contains("**this exact sentence**"), edited)
+        XCTAssertTrue(edited.contains("Bring the draft"), edited)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Markdown source includes the formatted editor change")
+        app.buttons["documentFormat"].hover()
+        attach(app.dialogs.firstMatch.screenshot(), name: "Format button with quiet hover background")
+    }
+
+    func testResetOnboardingThenSkipPreservesTheCurrentDraft() {
+        let app = launchPad(completed: true, format: "txt")
+        defer { app.terminate() }
+        app.typeKey("n", modifierFlags: .command)
+        let text = app.textViews.firstMatch
+        expectHittable(text)
+        let draft = "Draft retained through onboarding replay.\nKeep the second line too."
+        replaceText(draft, in: text, app: app)
+        expectValue(draft, in: text)
+
+        let settings = openSettings(app)
+        selectTab("About", in: settings)
+        let reset = settings.buttons["resetOnboarding"].firstMatch
+        expectHittable(reset)
+        attach(settings.screenshot(), name: "Reset onboarding below the About information")
+        reset.click()
+        XCTAssertTrue(element("onboardingIntro", in: app).waitForExistence(timeout: 5), app.debugDescription)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Onboarding replay preserves an existing draft behind it")
+        let skip = app.buttons["onboardingSkip"].firstMatch
+        expectHittable(skip)
+        skip.click()
+        expectValue("TXT", in: app.buttons["documentFormat"].firstMatch)
+        expectHittable(app.textViews.firstMatch)
+        expectValue(draft, in: app.textViews.firstMatch)
+        XCTAssertFalse(element("onboardingIntro", in: app).exists)
+
+        // The restored draft must remain editable rather than being a retained screenshot.
+        app.textViews.firstMatch.click()
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText("\nAnd continue editing.")
+        expectValue(draft + "\nAnd continue editing.", in: app.textViews.firstMatch)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Existing draft restored and edited after skipping replay")
+    }
+
+    func testCompactSettingsKeepTheSameFrameAndBottomControlsReachable() {
+        let app = launchPad(completed: true, format: "txt", accent: "custom")
+        defer { app.terminate() }
+        app.typeKey("n", modifierFlags: .command)
+        expectHittable(app.textViews.firstMatch)
+        let settings = openSettings(app)
+
+        selectTab("General", in: settings)
+        expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
+        let size = settings.frame.size
+        XCTAssertGreaterThan(size.height, 0)
+        XCTAssertLessThan(size.height, 580, "Settings should be shorter than the previous 580-point content area")
+        attach(settings.screenshot(), name: "Compact General settings with the bottom icon control visible")
+
+        selectTab("Files", in: settings)
+        expectHittable(element("File name", in: settings))
+        expectHittable(element("Insert filename variable", in: settings))
+        expectSize(size, of: settings)
+        attach(settings.screenshot(), name: "Compact Files settings with naming controls visible")
+
+        selectTab("Shortcuts", in: settings)
+        expectHittable(settings.searchFields["editingShortcut.saveAs"].firstMatch)
+        // Restore Defaults is intentionally disabled for a default fixture, but must be visible.
+        let restore = settings.buttons["Restore Defaults"].firstMatch
+        XCTAssertTrue(restore.exists, settings.debugDescription)
+        XCTAssertTrue(settings.frame.contains(restore.frame), settings.debugDescription)
+        expectSize(size, of: settings)
+        attach(settings.screenshot(), name: "Compact Shortcuts settings with the last recorder visible")
+
+        selectTab("About", in: settings)
+        let reset = settings.buttons["resetOnboarding"].firstMatch
+        expectHittable(reset)
+        let license = element("License", in: settings)
+        XCTAssertTrue(license.exists, settings.debugDescription)
+        XCTAssertGreaterThanOrEqual(reset.frame.minY, license.frame.maxY,
+                                    "Reset onboarding belongs below the About rows")
+        expectSize(size, of: settings)
+        attach(settings.screenshot(), name: "Compact About settings with Reset onboarding reachable")
+
+        selectTab("General", in: settings)
+        expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
+        expectSize(size, of: settings)
+    }
+
+    private func launchPad(completed: Bool = false, format: String = "md",
+                           appearance: String = "light", accent: String = "standard") -> XCUIApplication {
+        continueAfterFailure = false
+        // Run this suite with PAD_APP_IDENTIFIER=me.cyzr.pad.onboardingqa. The target
+        // resolves through XCUIApplication(), retaining compatibility with isolated app names.
+        // Argument-domain fixtures override values; onboarding writes stay in that QA container.
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-pad.onboardingCompleted", completed ? "YES" : "NO",
+            "-pad.format", format, "-pad.saveAutomatically", "NO", "-pad.floating", "NO",
+            "-pad.reusePeriod", "60", "-showInDock", "YES", "-menuBarItem", "YES",
+            "-appearance", appearance, "-accent", accent, "-pad.editingShortcuts", "invalid",
+            "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#,
+        ]
+        app.launch()
+        XCTAssertFalse(element("onboardingIntro", in: app).exists, "Initial launch must remain hidden")
+        XCTAssertFalse(app.buttons["documentFormat"].exists, "Initial launch must not open a draft")
+        return app
+    }
+
+    private func summonIntroduction(_ app: XCUIApplication) {
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(element("onboardingIntro", in: app).waitForExistence(timeout: 5), app.debugDescription)
+        expectHittable(app.buttons["onboardingStartPractice"].firstMatch)
+        XCTAssertFalse(app.buttons["documentFormat"].exists, "The normal editor stays hidden during introduction")
+    }
+
+    private func pressGlobalShortcutFromFinder() {
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        finder.activate()
+        XCTAssertTrue(finder.wait(for: .runningForeground, timeout: 5), finder.debugDescription)
+        let menuBar = finder.menuBars.firstMatch
+        XCTAssertTrue(menuBar.waitForExistence(timeout: 5), finder.debugDescription)
+        XCTAssertGreaterThan(menuBar.frame.width, 0)
+        menuBar.typeKey("p", modifierFlags: [.control, .option, .shift, .command])
+        // Pad is a nonactivating panel. The caller waits for its practice counter,
+        // rather than requiring the application to become the foreground app.
+    }
+
+    private func waitForMarkdownEditor(_ app: XCUIApplication) {
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        expectHittable(app.buttons["formattingToggle"].firstMatch, timeout: 15)
+        expectValue("MD", in: app.buttons["documentFormat"].firstMatch)
+        XCTAssertEqual(app.buttons["documentFormat"].firstMatch.label, "Markdown")
+    }
+
+    private func switchToText(_ app: XCUIApplication) {
+        let format = app.buttons["documentFormat"].firstMatch
+        expectHittable(format)
+        expectValue("MD", in: format)
+        format.click()
+        expectValue("TXT", in: format)
+        expectHittable(app.textViews.firstMatch)
+    }
+
+    private func replaceText(_ source: String, in text: XCUIElement, app: XCUIApplication) {
+        text.click()
+        app.typeKey("a", modifierFlags: .command)
+        app.typeText(source)
+    }
+
+    private func openSettings(_ app: XCUIApplication) -> XCUIElement {
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
+        return settings
+    }
+
+    private func selectTab(_ title: String, in settings: XCUIElement) {
+        let tab = settings.toolbars.buttons[title].firstMatch
+        expectHittable(tab)
+        tab.click()
+    }
+
+    private func element(_ identifier: String, in parent: XCUIElement) -> XCUIElement {
+        parent.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func expectHittable(_ element: XCUIElement, timeout: TimeInterval = 5,
+                                file: StaticString = #filePath, line: UInt = #line) {
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: timeout), .completed,
+                       element.debugDescription, file: file, line: line)
+    }
+
+    private func expectValue(_ expected: String, in element: XCUIElement,
+                             file: StaticString = #filePath, line: UInt = #line) {
+        let matches = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [matches], timeout: 5), .completed,
+                       "Expected \(String(reflecting: expected)); actual \(String(describing: element.value))",
+                       file: file, line: line)
+    }
+
+    private func expectTextContaining(_ expected: String, in element: XCUIElement,
+                                      file: StaticString = #filePath, line: UInt = #line) {
+        let matches = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value CONTAINS %@", expected), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [matches], timeout: 5), .completed,
+                       element.debugDescription, file: file, line: line)
+    }
+
+    private func expectSize(_ size: CGSize, of window: XCUIElement,
+                            file: StaticString = #filePath, line: UInt = #line) {
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            abs(window.frame.width - size.width) < 1 && abs(window.frame.height - size.height) < 1
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed,
+                       "Settings frame changed from \(size) to \(window.frame.size)", file: file, line: line)
+    }
+
+    private func attach(_ screenshot: XCUIScreenshot, name: String) {
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}
