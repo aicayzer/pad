@@ -58,6 +58,26 @@ import Testing
         #expect(onboarding.practiceCount == 1)
     }
 
+    @Test func navigationRetainsPracticeButAChangedShortcutInvalidatesIt() {
+        let fixture = OnboardingFixture()
+        defer { fixture.cleanUp() }
+        let onboarding = fixture.onboarding
+        onboarding.begin()
+        onboarding.startPractice()
+        onboarding.recordShortcut()
+        onboarding.showIntroduction()
+        #expect(onboarding.stage == .intro)
+        #expect(onboarding.practiceCount == 1)
+        onboarding.startPractice()
+        #expect(onboarding.stage == .practice)
+        #expect(onboarding.practiceCount == 1)
+        #expect(!onboarding.hasCompleted)
+        onboarding.resetPractice()
+        #expect(onboarding.practiceCount == 0)
+        #expect(onboarding.stage == .practice)
+        #expect(onboarding.isPresented)
+    }
+
     @Test func closingWithoutCompletionOffersTheIntroductionAgain() {
         let fixture = OnboardingFixture()
         defer { fixture.cleanUp() }

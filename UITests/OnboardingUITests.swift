@@ -11,10 +11,29 @@ final class OnboardingUITests: XCTestCase {
 
         let start = app.buttons["onboardingStartPractice"].firstMatch
         expectHittable(start)
+        XCTAssertEqual(start.label, "Next")
+        XCTAssertTrue(app.staticTexts["Your Pad for Thought"].exists)
+        XCTAssertFalse(app.buttons["onboardingDetails"].exists)
+        let skip = app.buttons["onboardingSkip"].firstMatch
+        XCTAssertLessThan(skip.frame.maxX, start.frame.minX)
+        XCTAssertEqual(skip.frame.midY, start.frame.midY, accuracy: 2)
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(element("onboardingPractice", in: app).waitForExistence(timeout: 5))
+        app.typeKey(.leftArrow, modifierFlags: [])
+        XCTAssertTrue(element("onboardingIntro", in: app).waitForExistence(timeout: 5))
         app.typeKey(.return, modifierFlags: [])
         let practice = element("onboardingPractice", in: app)
         XCTAssertTrue(practice.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(element("onboardingDone", in: app).exists)
+        let finish = app.buttons["onboardingContinue"].firstMatch
+        XCTAssertTrue(finish.exists)
+        XCTAssertEqual(finish.label, "Done")
+        XCTAssertFalse(finish.isEnabled)
+        app.typeKey(.return, modifierFlags: [])
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(practice.exists, "Return and Right must not bypass shortcut practice")
+        XCTAssertFalse(app.buttons["documentFormat"].exists)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Shortcut practice keeps Done visible and disabled")
         let shortcut = element("onboardingShortcut", in: app)
         XCTAssertTrue(shortcut.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(shortcut.label.contains("⌃⌥⇧⌘P") ||
@@ -35,7 +54,13 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(done.exists, app.debugDescription)
         XCTAssertTrue(practice.exists, app.debugDescription)
         XCTAssertFalse(app.buttons["documentFormat"].exists, app.debugDescription)
-        expectHittable(app.buttons["onboardingContinue"].firstMatch)
+        expectHittable(finish)
+        XCTAssertTrue(finish.isEnabled)
+        app.typeKey(.leftArrow, modifierFlags: [])
+        XCTAssertTrue(element("onboardingIntro", in: app).waitForExistence(timeout: 5))
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(practice.waitForExistence(timeout: 5))
+        XCTAssertTrue(finish.isEnabled, "Back and Next retain successful practice")
         app.typeKey(.return, modifierFlags: [])
         waitForMarkdownEditor(app)
         XCTAssertFalse(practice.exists, app.debugDescription)
@@ -58,9 +83,13 @@ final class OnboardingUITests: XCTestCase {
         defer { app.terminate() }
         summonIntroduction(app)
         attach(app.dialogs.firstMatch.screenshot(), name: "Native onboarding in Dark appearance")
-        app.typeKey(.tab, modifierFlags: [])
-        app.typeKey(.tab, modifierFlags: [])
-        app.typeKey(.return, modifierFlags: [])
+        let skip = app.buttons["onboardingSkip"].firstMatch
+        for _ in 0..<5 {
+            if skip.debugDescription.contains("Keyboard Focused") { break }
+            app.typeKey(.tab, modifierFlags: [])
+        }
+        XCTAssertTrue(skip.debugDescription.contains("Keyboard Focused"), "Skip must be reachable by Tab")
+        app.typeKey(.space, modifierFlags: [])
         waitForMarkdownEditor(app)
         switchToText(app)
 
@@ -93,6 +122,25 @@ final class OnboardingUITests: XCTestCase {
         attach(app.dialogs.firstMatch.screenshot(), name: "Markdown source includes the formatted editor change")
         app.buttons["documentFormat"].hover()
         attach(app.dialogs.firstMatch.screenshot(), name: "Format button with quiet hover background")
+    }
+
+    func testNoShortcutCanSkipWithoutPretendingPracticeSucceeded() {
+        let app = launchPad(accent: "custom", globalShortcutEnabled: false, customAccent: "216E4E")
+        defer { app.terminate() }
+        summonIntroduction(app)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Primary onboarding action respects a custom green accent")
+        app.buttons["onboardingStartPractice"].click()
+        let shortcut = element("onboardingShortcut", in: app)
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 5))
+        XCTAssertEqual(shortcut.label, "No global shortcut configured")
+        XCTAssertFalse(app.buttons["onboardingContinue"].isEnabled)
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(element("onboardingPractice", in: app).exists)
+        attach(app.dialogs.firstMatch.screenshot(), name: "No shortcut offers a clear Skip path")
+        app.buttons["onboardingSkip"].click()
+        waitForMarkdownEditor(app)
+        switchToText(app)
+        expectValue("", in: app.textViews.firstMatch)
     }
 
     func testResetOnboardingThenSkipPreservesTheCurrentDraft() {
@@ -174,7 +222,8 @@ final class OnboardingUITests: XCTestCase {
     }
 
     private func launchPad(completed: Bool = false, format: String = "md",
-                           appearance: String = "light", accent: String = "standard") -> XCUIApplication {
+                           appearance: String = "light", accent: String = "standard",
+                           globalShortcutEnabled: Bool = true, customAccent: String = "BEBAFC") -> XCUIApplication {
         continueAfterFailure = false
         // Run this suite with PAD_APP_IDENTIFIER=me.cyzr.pad.onboardingqa. The target
         // resolves through XCUIApplication(), retaining compatibility with isolated app names.
@@ -184,8 +233,9 @@ final class OnboardingUITests: XCTestCase {
             "-pad.onboardingCompleted", completed ? "YES" : "NO",
             "-pad.format", format, "-pad.saveAutomatically", "NO", "-pad.floating", "NO",
             "-pad.reusePeriod", "60", "-showInDock", "YES", "-menuBarItem", "YES",
-            "-appearance", appearance, "-accent", accent, "-pad.editingShortcuts", "invalid",
-            "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#,
+            "-appearance", appearance, "-accent", accent, "-customAccent", customAccent,
+            "-pad.editingShortcuts", "invalid",
+            "-KeyboardShortcuts_pad", globalShortcutEnabled ? #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""# : "NO",
         ]
         app.launch()
         XCTAssertFalse(element("onboardingIntro", in: app).exists, "Initial launch must remain hidden")

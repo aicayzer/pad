@@ -45,6 +45,16 @@ final class PadOnboarding {
         stage = .practice
     }
 
+    func showIntroduction() {
+        guard isPresented else { return }
+        stage = .intro
+    }
+
+    /// A changed global shortcut must be practiced again before completing.
+    func resetPractice() {
+        practiceCount = 0
+    }
+
     /// Called by the application's actual global shortcut handler, not local key matching.
     func recordShortcut() {
         guard isPresented, stage == .practice else { return }
