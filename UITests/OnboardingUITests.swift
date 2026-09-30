@@ -135,6 +135,8 @@ final class OnboardingUITests: XCTestCase {
         app.typeKey("n", modifierFlags: .command)
         expectHittable(app.textViews.firstMatch)
         let settings = openSettings(app)
+        attach(settings.screenshot(), name: "Settings on first opening before any tab selection")
+        XCTAssertLessThan(settings.frame.height, 580, "Restored Settings must be compact before switching tabs")
 
         selectTab("General", in: settings)
         expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
@@ -171,6 +173,17 @@ final class OnboardingUITests: XCTestCase {
         selectTab("General", in: settings)
         expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
         expectSize(size, of: settings)
+
+        settings.buttons[XCUIIdentifierCloseWindow].click()
+        expectSize(size, of: openSettings(app))
+
+        // Check restoration before selecting a tab, which can itself trigger a resize.
+        app.terminate()
+        app.launch()
+        app.typeKey("n", modifierFlags: .command)
+        let restoredSettings = openSettings(app)
+        expectSize(size, of: restoredSettings)
+        attach(restoredSettings.screenshot(), name: "Settings retains its compact size after relaunch")
     }
 
     private func launchPad(completed: Bool = false, format: String = "md",
