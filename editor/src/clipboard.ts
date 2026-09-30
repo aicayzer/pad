@@ -34,7 +34,25 @@ function nodeText(node: Node): string {
           : "- ";
       const task =
         item.attrs.checked == null ? "" : item.attrs.checked ? "[x] " : "[ ] ";
-      items.push(marker + task + clipboardText(item.content));
+      const prefix = marker + task;
+      const indent = " ".repeat(marker.length);
+      const blocks: string[] = [];
+      item.forEach((child, _childOffset, childIndex) => {
+        const text = nodeText(child);
+        const nestedList =
+          child.type.name === "bullet_list" ||
+          child.type.name === "ordered_list";
+        const lines = text.split("\n");
+        const indented = lines
+          .map((line, lineIndex) =>
+            childIndex === 0 && lineIndex === 0 ? prefix + line : indent + line,
+          )
+          .join("\n");
+        // Nested lists follow their parent directly; subsequent paragraphs keep
+        // their blank line and every continuation stays inside its list item.
+        blocks.push((childIndex > 0 && !nestedList ? "\n" : "") + indented);
+      });
+      items.push(blocks.length ? blocks.join("\n") : prefix.trimEnd());
     });
     return items.join("\n");
   }

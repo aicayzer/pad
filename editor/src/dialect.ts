@@ -3,6 +3,7 @@ import type { Ctx, MilkdownPlugin } from "@milkdown/kit/ctx";
 import type { Node as ProseNode } from "@milkdown/kit/prose/model";
 import {
   commonmark,
+  hardbreakSchema,
   paragraphSchema,
   remarkInlineLinkPlugin,
 } from "@milkdown/kit/preset/commonmark";
@@ -151,11 +152,32 @@ const preserveSpacerParagraphs = paragraphSchema.extendSchema(
   },
 );
 
+// Soft Markdown breaks still serialize as a single newline. Display the actual
+// line boundary rather than a space, so changing editor mode never joins lines.
+const visibleSoftbreaks = hardbreakSchema.extendSchema((base) => (ctx) => {
+  const schema = base(ctx);
+  return {
+    ...schema,
+    parseDOM: [
+      {
+        tag: 'br[data-type="softbreak"]',
+        getAttrs: () => ({ isInline: true }),
+      },
+      ...(schema.parseDOM ?? []),
+    ],
+    toDOM: (node) =>
+      node.attrs.isInline
+        ? ["br", { "data-type": "softbreak" }]
+        : schema.toDOM!(node),
+  };
+});
+
 export const dialect: MilkdownPlugin[] = [
   // Protect unsupported inline HTML before the empty-line plugin consumes break nodes.
   preserveLiterals,
   commonmarkWithLiteralReferences,
   preserveSpacerParagraphs,
+  visibleSoftbreaks,
   autolinkInputRule,
   extendListItemSchemaForTask,
   strikethroughAttr,

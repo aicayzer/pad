@@ -138,3 +138,39 @@ test("copy retains hard breaks, authored blank paragraphs, and literal unsupport
     );
   });
 });
+
+test("plain clipboard keeps nested list hierarchy and continuation paragraphs", async () => {
+  await withEditor((editor) => {
+    editor.load(
+      "- Parent\n  - Child\n    3. Nested three\n    4. Nested four\n\n  Continuation paragraph\n\n- Other\n\n9. Nine\n   - Nested bullet\n10. Ten",
+      1,
+    );
+    expect(editor.clipboard().text).toBe(
+      "- Parent\n  - Child\n    3. Nested three\n    4. Nested four\n\n  Continuation paragraph\n- Other\n\n9. Nine\n   - Nested bullet\n10. Ten",
+    );
+  });
+});
+
+test("soft line breaks remain visible without converting or dirtying source", async () => {
+  await withEditor((editor, ctx) => {
+    const source = "sdfsdf\n\nsadfsdfasdf\n\nasdfasdf\nsadfasdf";
+    editor.load(source, 1);
+    const view = ctx.get(editorViewCtx);
+    expect(view.dom.querySelector('br[data-type="softbreak"]')).not.toBeNull();
+    expect(editor.clipboard().text).toBe(source);
+    expect(editor.markdown()).toBe(null);
+    const copied = editor.clipboard();
+    view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc)));
+    view.pasteHTML(copied.html, pasteEvent(copied.text, copied.html));
+    expect(editor.markdown()).toBe(null);
+    view.dispatch(
+      view.state.tr.insertText("!", view.state.doc.content.size - 1),
+    );
+    const saved = editor.markdown()!;
+    expect(saved).toBe(source + "!\n");
+    editor.load(saved, 2);
+    expect(view.dom.querySelector('br[data-type="softbreak"]')).not.toBeNull();
+    expect(editor.clipboard().text).toBe(source + "!");
+    expect(editor.markdown()).toBe(null);
+  });
+});
