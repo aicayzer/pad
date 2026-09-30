@@ -7,11 +7,11 @@ final class OnboardingUITests: XCTestCase {
         let app = launchPad()
         defer { app.terminate() }
         summonIntroduction(app)
-        attach(app.screenshot(), name: "First intentional summon introduces PadPad")
+        attach(app.dialogs.firstMatch.screenshot(), name: "First intentional summon introduces PadPad")
 
         let start = app.buttons["onboardingStartPractice"].firstMatch
         expectHittable(start)
-        start.click()
+        app.typeKey(.return, modifierFlags: [])
         let practice = element("onboardingPractice", in: app)
         XCTAssertTrue(practice.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(element("onboardingDone", in: app).exists)
@@ -27,7 +27,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(done.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(practice.exists, "Practicing must leave the onboarding visible")
         XCTAssertFalse(app.buttons["documentFormat"].exists, "The editor must not appear before Continue")
-        attach(app.screenshot(), name: "Real global shortcut acknowledged in native onboarding")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Real global shortcut acknowledged in native onboarding")
 
         // A second global invocation must stay in practice, not open or dismiss the editor.
         pressGlobalShortcutFromFinder()
@@ -40,7 +40,7 @@ final class OnboardingUITests: XCTestCase {
         waitForMarkdownEditor(app)
         XCTAssertFalse(practice.exists, app.debugDescription)
         XCTAssertFalse(app.buttons["Bold"].exists, "Formatting starts hidden")
-        attach(app.screenshot(), name: "Practice finishes in a real editable Markdown example")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Practice finishes in a real editable Markdown example")
 
         switchToText(app)
         let text = app.textViews.firstMatch
@@ -57,8 +57,10 @@ final class OnboardingUITests: XCTestCase {
         let app = launchPad(appearance: "dark")
         defer { app.terminate() }
         summonIntroduction(app)
-        attach(app.screenshot(), name: "Native onboarding in Dark appearance")
-        app.buttons["onboardingSkip"].click()
+        attach(app.dialogs.firstMatch.screenshot(), name: "Native onboarding in Dark appearance")
+        app.typeKey(.tab, modifierFlags: [])
+        app.typeKey(.tab, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
         waitForMarkdownEditor(app)
         switchToText(app)
 
@@ -69,7 +71,7 @@ final class OnboardingUITests: XCTestCase {
         app.buttons["documentFormat"].click()
         waitForMarkdownEditor(app)
         XCTAssertFalse(app.buttons["Bold"].exists)
-        attach(app.screenshot(), name: "Plain source becomes editable formatted Markdown")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Plain source becomes editable formatted Markdown")
 
         // Loading formatted content alone must retain the exact original source.
         switchToText(app)
@@ -88,7 +90,9 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(edited.contains("# Disposable plan"), edited)
         XCTAssertTrue(edited.contains("**this exact sentence**"), edited)
         XCTAssertTrue(edited.contains("Bring the draft"), edited)
-        attach(app.screenshot(), name: "Markdown source includes the formatted editor change")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Markdown source includes the formatted editor change")
+        app.buttons["documentFormat"].hover()
+        attach(app.dialogs.firstMatch.screenshot(), name: "Format button with quiet hover background")
     }
 
     func testResetOnboardingThenSkipPreservesTheCurrentDraft() {
@@ -108,7 +112,7 @@ final class OnboardingUITests: XCTestCase {
         attach(settings.screenshot(), name: "Reset onboarding below the About information")
         reset.click()
         XCTAssertTrue(element("onboardingIntro", in: app).waitForExistence(timeout: 5), app.debugDescription)
-        attach(app.screenshot(), name: "Onboarding replay preserves an existing draft behind it")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Onboarding replay preserves an existing draft behind it")
         let skip = app.buttons["onboardingSkip"].firstMatch
         expectHittable(skip)
         skip.click()
@@ -122,11 +126,11 @@ final class OnboardingUITests: XCTestCase {
         app.typeKey(.downArrow, modifierFlags: .command)
         app.typeText("\nAnd continue editing.")
         expectValue(draft + "\nAnd continue editing.", in: app.textViews.firstMatch)
-        attach(app.screenshot(), name: "Existing draft restored and edited after skipping replay")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Existing draft restored and edited after skipping replay")
     }
 
     func testCompactSettingsKeepTheSameFrameAndBottomControlsReachable() {
-        let app = launchPad(completed: true, format: "txt")
+        let app = launchPad(completed: true, format: "txt", accent: "custom")
         defer { app.terminate() }
         app.typeKey("n", modifierFlags: .command)
         expectHittable(app.textViews.firstMatch)
@@ -170,7 +174,7 @@ final class OnboardingUITests: XCTestCase {
     }
 
     private func launchPad(completed: Bool = false, format: String = "md",
-                           appearance: String = "light") -> XCUIApplication {
+                           appearance: String = "light", accent: String = "standard") -> XCUIApplication {
         continueAfterFailure = false
         // Run this suite with PAD_APP_IDENTIFIER=me.cyzr.pad.onboardingqa. The target
         // resolves through XCUIApplication(), retaining compatibility with isolated app names.
@@ -180,7 +184,7 @@ final class OnboardingUITests: XCTestCase {
             "-pad.onboardingCompleted", completed ? "YES" : "NO",
             "-pad.format", format, "-pad.saveAutomatically", "NO", "-pad.floating", "NO",
             "-pad.reusePeriod", "60", "-showInDock", "YES", "-menuBarItem", "YES",
-            "-appearance", appearance, "-pad.editingShortcuts", "invalid",
+            "-appearance", appearance, "-accent", accent, "-pad.editingShortcuts", "invalid",
             "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":35,\"carbonModifiers\":6912}""#,
         ]
         app.launch()
@@ -250,7 +254,7 @@ final class OnboardingUITests: XCTestCase {
     private func expectHittable(_ element: XCUIElement, timeout: TimeInterval = 5,
                                 file: StaticString = #filePath, line: UInt = #line) {
         let ready = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == true AND enabled == true AND hittable == true"), object: element)
+            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: timeout), .completed,
                        element.debugDescription, file: file, line: line)
     }

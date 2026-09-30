@@ -239,6 +239,7 @@ final class PadDocument {
             return true
         } catch {
             self.error = "Could not read the editor. Your document is still open. " + error.localizedDescription
+            onboarding.dismiss()
             show()
             if !isActive, !onboarding.isPresented { panel?.resumeEditor() }
             return false
@@ -292,7 +293,8 @@ final class PadDocument {
         if !onboarding.isPresented {
             guard await captureLatestEditor() else { return }
         }
-        onboarding.begin()
+        panel?.prepareOnboarding()
+        onboarding.begin(resetCompletion: true)
         isActive = false
         show()
     }
@@ -331,7 +333,8 @@ final class PadDocument {
             show()
             return true
         }
-        guard presentsWindow, isPristineScratch, onboarding.beginIfNeeded() else { return false }
+        guard presentsWindow, isPristineScratch, error == nil, onboarding.beginIfNeeded() else { return false }
+        panel?.prepareOnboarding()
         isActive = false
         show()
         return true
@@ -382,8 +385,9 @@ final class PadDocument {
 
     func toggle(now: Date = .now) {
         guard !isBusy else { return }
-        if presentOnboardingIfNeeded() { return }
+        if onboarding.isPresented { show(); return }
         if synchronizeEditorThen({ self.toggle(now: now) }) { return }
+        if presentOnboardingIfNeeded() { return }
         guard !isBusy else { return }
         if isVisible {
             close(now: now)
@@ -397,6 +401,8 @@ final class PadDocument {
 
     func showCurrent(now: Date = .now) {
         guard !isBusy else { return }
+        if !onboarding.hasCompleted, !onboarding.isPresented,
+           synchronizeEditorThen({ self.showCurrent(now: now) }) { return }
         if presentOnboardingIfNeeded() { return }
         if isVisible {
             show()
@@ -407,6 +413,7 @@ final class PadDocument {
 
     func commandNew(now: Date = .now) {
         guard !isBusy else { return }
+        if !onboarding.isPresented, synchronizeEditorThen({ self.commandNew(now: now) }) { return }
         if presentOnboardingIfNeeded() { return }
         newFile(now: now)
     }
@@ -461,15 +468,19 @@ final class PadDocument {
     }
 
     private func openDocument(_ file: URL) {
+        let leavingOnboarding = onboarding.isPresented
         guard ["txt", "md"].contains(file.pathExtension.lowercased()) else {
             error = PadError.unsupported.localizedDescription
+            onboarding.dismiss()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
             return
         }
         if file.standardizedFileURL == url?.standardizedFileURL {
             onboarding.dismiss()
             refreshCurrentFile()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
             return
         }
         let accessing = file.startAccessingSecurityScopedResource()
@@ -478,6 +489,11 @@ final class PadDocument {
             guard let content = String(data: bytes, encoding: .utf8) else { throw PadError.encoding }
             guard finishCurrent() else {
                 if accessing { file.stopAccessingSecurityScopedResource() }
+                if leavingOnboarding {
+                    onboarding.dismiss()
+                    show()
+                    panel?.resumeEditor()
+                }
                 return
             }
             documentScope?.stopAccessingSecurityScopedResource()
@@ -495,10 +511,13 @@ final class PadDocument {
             notice = nil
             reloadEditor()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
         } catch {
             if accessing { file.stopAccessingSecurityScopedResource() }
             self.error = error.localizedDescription
+            onboarding.dismiss()
             show()
+            if leavingOnboarding { panel?.resumeEditor() }
         }
     }
 
@@ -856,7 +875,6 @@ final class PadDocument {
         guard presentsWindow else { return }
         if panel == nil { panel = PadPanel(files: self) }
         updateTitle()
-        if onboarding.isPresented { panel?.prepareOnboarding() }
         // PadPanel.becomeKey owns activation; focus cannot succeed before the window is key.
         panel?.makeKeyAndOrderFront(nil)
     }

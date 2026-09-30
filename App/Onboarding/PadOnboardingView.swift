@@ -72,6 +72,7 @@ struct PadOnboardingView: View {
         }
         .onKeyPress(.return, phases: [.down, .repeat], action: handleReturn)
         .onExitCommand(perform: onClose)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding")
     }
 
@@ -130,6 +131,7 @@ struct PadOnboardingView: View {
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: 400)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboardingIntro")
     }
 
@@ -159,6 +161,7 @@ struct PadOnboardingView: View {
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: 400)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboardingPractice")
     }
 
@@ -202,6 +205,7 @@ struct PadOnboardingView: View {
         HStack {
             if onboarding.stage == .intro {
                 Button("What stays, what goes") { showingDetails = true }
+                    .focusable(interactions: .edit)
                     .focused($focusedControl, equals: .details)
                     .accessibilityIdentifier("onboardingDetails")
                     .popover(isPresented: $showingDetails, arrowEdge: .bottom) {
@@ -218,11 +222,13 @@ struct PadOnboardingView: View {
                     }
             } else {
                 Button("Back") { onboarding.begin() }
+                    .focusable(interactions: .edit)
                     .focused($focusedControl, equals: .back)
                     .accessibilityIdentifier("onboardingBack")
             }
             Spacer()
             Button("Skip", action: onSkip)
+                .focusable(interactions: .edit)
                 .focused($focusedControl, equals: .skip)
                 .accessibilityIdentifier("onboardingSkip")
         }
@@ -258,6 +264,7 @@ struct PadOnboardingView: View {
         .buttonStyle(OnboardingPrimaryButtonStyle(color: lavender, isFocused: focusedControl == control))
         .disabled(!available)
         .focusable(available, interactions: .edit)
+        .focusEffectDisabled()
         .focused($focusedControl, equals: control)
         .accessibilityLabel(title)
         .accessibilityHint(returnHint ? "Press Return to continue" : "")

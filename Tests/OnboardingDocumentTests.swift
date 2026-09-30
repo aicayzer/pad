@@ -26,11 +26,14 @@ import Testing
         try Data("saved version".utf8).write(to: file)
         document.open(file)
         document.saveAutomatically = true
+        document.onboarding.complete()
         let id = document.documentID
         let source = "# Latest edit\r\n\n**Still unsaved**\n"
         document.editorSnapshot = { source }
         await document.restartOnboarding()
         #expect(document.onboarding.isPresented)
+        #expect(!document.onboarding.hasCompleted)
+        #expect(!fixture.defaults.bool(forKey: "pad.onboardingCompleted"))
         #expect(!document.isActive)
         #expect(document.text == source)
         #expect(document.savedText == "saved version")
@@ -173,6 +176,21 @@ import Testing
         #expect(!document.onboarding.hasCompleted)
         #expect(document.url == file)
         #expect(document.text == "An existing file")
+    }
+
+    @Test func failedFileOpenLeavesOnboardingToShowTheRetainedDocumentError() async throws {
+        let fixture = try OnboardingDocumentFixture()
+        defer { fixture.cleanUp() }
+        let document = fixture.document
+        document.text = "Keep this draft"
+        let id = document.documentID
+        await document.restartOnboarding()
+        document.open(fixture.root.appending(path: "missing.txt"))
+        #expect(!document.onboarding.isPresented)
+        #expect(document.error != nil)
+        #expect(document.text == "Keep this draft")
+        #expect(document.documentID == id)
+        #expect(document.url == nil)
     }
 }
 
