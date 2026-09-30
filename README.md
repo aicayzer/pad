@@ -28,7 +28,7 @@ Copy All Contents (⇧⌘C) copies the whole document without changing your sele
 
 Aa beside Share reveals formatting in the center of the top toolbar. Formatting starts hidden each session, and narrow windows keep additional actions in an overflow menu.
 
-The MD/TXT button at the bottom of the editor switches the current draft between formatted Markdown and plain-text source. For an existing file, it offers Save As with the new extension and keeps the original file.
+The MD/TXT button at the bottom of the editor switches the current draft between formatted Markdown and plain-text source, retaining line breaks. For an existing file, it offers Save As with the new extension and keeps the original file.
 
 ## A few shortcuts
 
