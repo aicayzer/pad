@@ -183,6 +183,11 @@ final class PadPanel: NSPanel {
             }
             return true
         }
+        if files.editingShortcuts.copyAllShortcutAvailable,
+           modifiers == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "c" {
+            if !files.onboarding.isPresented { Task { await files.copyAllContents() } }
+            return true
+        }
         if modifiers == .command {
             switch event.charactersIgnoringModifiers {
             case "w": files.close()

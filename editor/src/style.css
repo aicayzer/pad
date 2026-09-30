@@ -20,8 +20,9 @@ body {
 
 body {
   color: var(--text);
+  /* WebKit paints the native caret using this line box; extra leading stretches it above the text. */
   font:
-    1rem/1.55 -apple-system,
+    1rem/normal -apple-system,
     BlinkMacSystemFont,
     system-ui,
     sans-serif;

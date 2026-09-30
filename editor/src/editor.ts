@@ -6,6 +6,7 @@ import {
   remarkStringifyOptionsCtx,
   rootCtx,
 } from "@milkdown/kit/core";
+import { clipboardContent, visibleClipboard } from "./clipboard";
 import { clipboard } from "@milkdown/kit/plugin/clipboard";
 import { history } from "@milkdown/kit/plugin/history";
 import { cursor } from "@milkdown/kit/plugin/cursor";
@@ -390,6 +391,11 @@ export class PadEditor {
 
   private constructor(private readonly events: EditorEvents) {}
 
+  clipboard() {
+    const { doc, schema } = this.editor.ctx.get(editorViewCtx).state;
+    return clipboardContent(doc.content, schema);
+  }
+
   // The app's bindings, replaced whole whenever they change; the plugin stays.
   private keymapPlugin = $prose(
     () =>
@@ -447,6 +453,7 @@ export class PadEditor {
       })
       .use(caretStatePlugin(events))
       .use(pastePlugin())
+      .use(visibleClipboard)
       .use(instance.keymapPlugin)
       .use(dialect)
       .use(instance.changePlugin)

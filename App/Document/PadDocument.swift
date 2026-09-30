@@ -113,6 +113,7 @@ final class PadDocument {
     private var snapshotApplied = false
     private var editorLoadedSource = ""
     private(set) var markdownEditor: PadMarkdownEditorController?
+    @ObservationIgnored var editorClipboard: (@MainActor () async throws -> PadClipboardContents)?
     @ObservationIgnored var editorSnapshot: (@MainActor () async throws -> String?)?
     private var openedFromDisk = false
     private var pendingName: String?
@@ -219,6 +220,10 @@ final class PadDocument {
             guard let editor else { throw CocoaError(.coderReadCorrupt) }
             return try await editor.snapshot()
         }
+        editorClipboard = { [weak editor] in
+            guard let editor else { throw PadMarkdownEditorError.unavailable }
+            return try await editor.clipboardSnapshot()
+        }
         editorLoadedSource = text
         editor.load(text, documentID: documentID)
     }
@@ -260,6 +265,28 @@ final class PadDocument {
             action()
         }
         return true
+    }
+
+    func copyAllContents(asMarkdown: Bool = false, to pasteboard: NSPasteboard = .general) async {
+        guard !isBusy, !onboarding.isPresented else { return }
+        operation = .transition
+        defer { operation = nil }
+        let id = documentID
+        guard await captureLatestEditor(), documentID == id else { return }
+        do {
+            let contents: PadClipboardContents
+            if currentFormat == .md, !asMarkdown {
+                guard let editorClipboard else { throw PadMarkdownEditorError.unavailable }
+                contents = try await editorClipboard()
+            } else {
+                contents = PadClipboardContents(text: text)
+            }
+            guard documentID == id else { return }
+            contents.write(to: pasteboard)
+            notice = "Copied"
+        } catch {
+            self.error = "Could not copy the document. " + error.localizedDescription
+        }
     }
 
     func prepareToTerminate() async -> Bool {
