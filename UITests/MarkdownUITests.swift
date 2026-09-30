@@ -305,6 +305,48 @@ final class MarkdownUITests: XCTestCase {
         attach(app.dialogs.firstMatch.screenshot(), name: "Copy All retains formatting and the selected replacement range")
     }
 
+    func testPlainTextSoftLineBreaksSurviveFormatSwitchEditingAndReopen() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let app = launchPad()
+        defer { app.terminate() }
+        waitForEditor(app)
+        let format = app.buttons["documentFormat"].firstMatch
+        format.click()
+        let plain = app.textViews.firstMatch
+        XCTAssertTrue(plain.waitForExistence(timeout: 5), app.debugDescription)
+        let source = "sdfsdf\n\nsadfsdfasdf\n\nasdfasdf\nsadfasdf"
+        paste(source, into: app)
+        app.typeKey("c", modifierFlags: [.command, .shift])
+        waitForClipboard(source)
+        format.click()
+        waitForEditor(app)
+        app.typeKey("c", modifierFlags: [.command, .shift])
+        waitForClipboard(source)
+        attach(app.dialogs.firstMatch.screenshot(), name: "TXT to Markdown keeps the final two lines separate")
+        let html = try XCTUnwrap(NSPasteboard.general.string(forType: .html))
+        XCTAssertTrue(html.contains("asdfasdf<br"), html)
+        format.click()
+        XCTAssertTrue(plain.waitForExistence(timeout: 5))
+        XCTAssertEqual(plain.value as? String, source, "Untouched Markdown must retain exact TXT source")
+        format.click()
+        waitForEditor(app)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText(" edited")
+        let saved = try saveAs(app, directory: directory)
+        let expected = source + " edited"
+        let persisted = try String(contentsOf: saved, encoding: .utf8)
+        XCTAssertTrue(persisted.contains("asdfasdf\nsadfasdf edited"), persisted)
+        app.typeKey("n", modifierFlags: .command)
+        waitForEditor(app)
+        app.typeKey("o", modifierFlags: .command)
+        open(saved, in: app)
+        waitForEditor(app)
+        app.typeKey("c", modifierFlags: [.command, .shift])
+        waitForClipboard(expected)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Edited Markdown reopened with separate soft-break lines")
+    }
+
     private func waitForClipboard(_ expected: String) {
         let copied = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             NSPasteboard.general.string(forType: .string) == expected
