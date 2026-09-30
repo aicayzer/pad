@@ -3,7 +3,7 @@ import type { Ctx, MilkdownPlugin } from "@milkdown/kit/ctx";
 import type { Node as ProseNode } from "@milkdown/kit/prose/model";
 import {
   commonmark,
-  remarkPreserveEmptyLinePlugin,
+  paragraphSchema,
   remarkInlineLinkPlugin,
 } from "@milkdown/kit/preset/commonmark";
 import {
@@ -126,16 +126,36 @@ export const remarkDialectPlugin = $remark(
   () => remarkDialect,
 );
 
-// Empty paragraphs stay spacing. References remain literal instead of being rewritten as inline links.
-const commonmarkWithoutEmptyLines = commonmark.filter(
-  (plugin) =>
-    ![...remarkPreserveEmptyLinePlugin, ...remarkInlineLinkPlugin].includes(
-      plugin,
-    ),
+// Keep authored spacer paragraphs; references remain literal instead of becoming inline links.
+const commonmarkWithLiteralReferences = commonmark.filter(
+  (plugin) => !remarkInlineLinkPlugin.includes(plugin),
+);
+
+// The preset drops the final empty paragraph, which makes trailing spacers shrink on each reload.
+const preserveSpacerParagraphs = paragraphSchema.extendSchema(
+  (base) => (ctx) => {
+    const schema = base(ctx);
+    return {
+      ...schema,
+      toMarkdown: {
+        ...schema.toMarkdown,
+        runner(state, node) {
+          if (node.content.size > 0)
+            return schema.toMarkdown.runner(state, node);
+          state.openNode("paragraph");
+          state.addNode("html", undefined, "<br />");
+          state.closeNode();
+        },
+      },
+    };
+  },
 );
 
 export const dialect: MilkdownPlugin[] = [
-  commonmarkWithoutEmptyLines,
+  // Protect unsupported inline HTML before the empty-line plugin consumes break nodes.
+  preserveLiterals,
+  commonmarkWithLiteralReferences,
+  preserveSpacerParagraphs,
   autolinkInputRule,
   extendListItemSchemaForTask,
   strikethroughAttr,
@@ -146,7 +166,6 @@ export const dialect: MilkdownPlugin[] = [
   wrapInTaskListInputRule,
   remarkDialectPlugin,
   literalBlock,
-  preserveLiterals,
 ].flat();
 
 // One output form, so a document written back unchanged is byte-stable.
@@ -159,23 +178,16 @@ export const stringifyOptions: StringifyOptions = {
   rule: "-",
 };
 
-// Empty paragraphs are spacing, not content, so they are left out of the markdown.
-function withoutEmptyParagraphs(doc: ProseNode): ProseNode {
-  const blocks: ProseNode[] = [];
-  doc.forEach((block) => {
-    if (block.type.name !== "paragraph" || block.content.size > 0)
-      blocks.push(block);
-  });
-  if (blocks.length === doc.childCount) return doc;
-  return doc.type.create(
-    doc.attrs,
-    blocks.length > 0 ? blocks : [doc.child(0)],
-  );
-}
-
+// Milkdown preserves authored spacer paragraphs with standalone Markdown HTML breaks.
 export function serialize(
   ctx: Ctx,
   doc: ProseNode = ctx.get(editorViewCtx).state.doc,
 ): string {
-  return ctx.get(serializerCtx)(withoutEmptyParagraphs(doc));
+  if (
+    doc.childCount === 1 &&
+    doc.firstChild?.type.name === "paragraph" &&
+    doc.firstChild.content.size === 0
+  )
+    return "";
+  return ctx.get(serializerCtx)(doc);
 }

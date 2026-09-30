@@ -88,3 +88,46 @@ test("frontmatter requires matching opening and closing delimiters", async () =>
     expect(view.dom.textContent).toContain("Body");
   });
 });
+
+for (const marker of ["<br />", "<br>", "<br >", "<br/>"]) {
+  test(`standalone ${marker} is editable spacing, not literal HTML`, async () => {
+    const source = `One\n\n${marker}\n\nTwo\n`;
+    await withEditor(source, (editor) => {
+      const view = editor.ctx.get(editorViewCtx);
+      expect(view.state.doc.childCount).toBe(3);
+      expect(view.state.doc.child(1).type.name).toBe("paragraph");
+      expect(view.state.doc.child(1).content.size).toBe(0);
+      expect(view.dom.querySelector(".literal-markdown")).toBeNull();
+    });
+  });
+}
+for (const raw of [
+  "Before <br /> after",
+  '<br class="custom" />',
+  "<br />\n<script>alert(1)</script>",
+]) {
+  test(`other HTML remains literal: ${raw}`, async () => {
+    await withEditor(raw + "\n", (editor) => {
+      const view = editor.ctx.get(editorViewCtx);
+      expect(view.dom.querySelector(".literal-markdown")?.textContent).toBe(
+        raw,
+      );
+      expect(serialize(editor.ctx)).toContain(raw);
+    });
+  });
+}
+for (const source of [
+  "<br />\n\nText\n",
+  "Text\n\n<br />\n",
+  "Text\n\n<br />\n\n<br />\n",
+  "<br />\n\n<br />\n",
+  "One\n\n<br />\n\n<br />\n\nTwo\n",
+  "> One\n>\n> <br />\n>\n> Two\n",
+  "- One\n\n  <br />\n\n  Two\n",
+]) {
+  test(`spacer paragraphs round-trip: ${JSON.stringify(source)}`, async () => {
+    const once = await roundTrip(source);
+    expect(once).toBe(source);
+    expect(await roundTrip(once)).toBe(source);
+  });
+}

@@ -142,12 +142,17 @@ final class MarkdownUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Bold"].exists)
         app.typeText("Selected text")
         app.typeKey("a", modifierFlags: .command)
+        let editorFrame = app.webViews.firstMatch.frame
         toggle.click()
         let bold = app.buttons["Bold"].firstMatch
         XCTAssertTrue(bold.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(toggle.value as? String, "Shown")
+        XCTAssertEqual(bold.frame.midY, toggle.frame.midY, accuracy: 2, "Formatting belongs in the top toolbar")
+        XCTAssertLessThan(bold.frame.maxX, toggle.frame.minX)
+        XCTAssertEqual(app.webViews.firstMatch.frame.minY, editorFrame.minY, accuracy: 1, "Showing formatting must not add an editor row")
+        XCTAssertEqual(app.webViews.firstMatch.frame.height, editorFrame.height, accuracy: 1)
         app.webViews.firstMatch.hover()
-        attach(app.screenshot(), name: "Formatting row shown beside stable Markdown editor")
+        attach(app.dialogs.firstMatch.screenshot(), name: "Formatting centered in the top toolbar without moving the editor")
         bold.click()
         toggle.click()
         XCTAssertFalse(bold.exists)
@@ -166,6 +171,98 @@ final class MarkdownUITests: XCTestCase {
         waitForEditor(app)
         XCTAssertFalse(app.buttons["Bold"].exists, "Formatting visibility is not persisted between launches")
         XCTAssertEqual(app.buttons["formattingToggle"].firstMatch.value as? String, "Hidden")
+    }
+
+    func testNarrowToolbarOverflowFormatsSelectedParagraphAndSaves() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let app = launchPad()
+        defer { app.terminate() }
+        waitForEditor(app)
+        app.typeText("Keep plain\n\nSelected text")
+        app.typeKey(.leftArrow, modifierFlags: [.command, .shift])
+        let toggle = app.buttons["formattingToggle"].firstMatch
+        toggle.click()
+
+        let window = app.dialogs.firstMatch
+        let originalFrame = window.frame
+        // Activate before dragging the outside resize edge of this nonactivating panel.
+        app.activate()
+        let resizeHandle = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: 1, dy: 0))
+        let narrowEdge = window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 521, dy: originalFrame.height / 2))
+        resizeHandle.hover()
+        resizeHandle.click(forDuration: 0.2, thenDragTo: narrowEdge,
+                           withVelocity: .slow, thenHoldForDuration: 0.2)
+        XCTAssertLessThanOrEqual(window.frame.width, 540, "The window must reach its narrow layout")
+
+        let overflow = app.menuButtons["formattingOverflow"].firstMatch
+        XCTAssertTrue(overflow.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(overflow.isHittable)
+        XCTAssertEqual(overflow.frame.midY, toggle.frame.midY, accuracy: 2)
+        XCTAssertLessThan(overflow.frame.maxX, toggle.frame.minX)
+        XCTAssertTrue(app.buttons["Save"].firstMatch.isHittable)
+        attach(app.dialogs.firstMatch.screenshot(), name: "Narrow top toolbar keeps formatting overflow and Save available")
+        overflow.click()
+        let quote = app.menuItems["Quote"].firstMatch
+        XCTAssertTrue(quote.waitForExistence(timeout: 5), app.debugDescription)
+        quote.click()
+
+        let saved = try saveAs(app, directory: directory)
+        let contents = try String(contentsOf: saved, encoding: .utf8)
+        XCTAssertEqual(contents.trimmingCharacters(in: .whitespacesAndNewlines), "Keep plain\n\n<br />\n\n> Selected text")
+    }
+
+    func testAuthoredBlankParagraphsSurviveFileSwitchAndRepeatedReopen() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let app = launchPad()
+        defer { app.terminate() }
+        waitForEditor(app)
+        app.typeText("- First item")
+        for _ in 0..<4 { app.typeKey(.return, modifierFlags: []) }
+        app.typeText("- Second item")
+        for _ in 0..<4 { app.typeKey(.return, modifierFlags: []) }
+        attach(app.dialogs.firstMatch.screenshot(), name: "Authored blank paragraphs between lists and at the end")
+        let saved = try saveAs(app, directory: directory)
+        let original = try String(contentsOf: saved, encoding: .utf8)
+        let spacers = original.components(separatedBy: "<br />").count - 1
+        XCTAssertGreaterThanOrEqual(spacers, 4, original)
+        XCTAssertTrue(original.contains("- First item"), original)
+        XCTAssertTrue(original.contains("- Second item"), original)
+
+        for cycle in 1...2 {
+            app.typeKey("n", modifierFlags: .command)
+            waitForEditor(app)
+            app.typeText("A different disposable draft")
+            app.typeKey("o", modifierFlags: .command)
+            open(saved, in: app)
+            waitForEditor(app)
+            app.typeKey(.downArrow, modifierFlags: .command)
+            app.typeText("Continued editing")
+            app.typeKey("s", modifierFlags: .command)
+            waitForFile(saved, containing: "Continued editing")
+            let edited = try String(contentsOf: saved, encoding: .utf8)
+            XCTAssertEqual(edited.components(separatedBy: "<br />").count - 1, spacers - 1, edited)
+            // Restore the trailing empty paragraph and force a fresh serialization.
+            app.typeKey(.leftArrow, modifierFlags: [.command, .shift])
+            app.typeKey(.delete, modifierFlags: [])
+            app.typeKey("s", modifierFlags: .command)
+            let stable = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                (try? String(contentsOf: saved, encoding: .utf8)) == original
+            }, object: nil)
+            _ = XCTWaiter.wait(for: [stable], timeout: 5)
+            let restored = try String(contentsOf: saved, encoding: .utf8)
+            if restored != original {
+                let evidence = XCTAttachment(string: "Expected: \(String(reflecting: original))\nActual: \(String(reflecting: restored))")
+                evidence.name = "Exact Markdown after reopen cycle \(cycle)"
+                evidence.lifetime = .keepAlways
+                add(evidence)
+            }
+            XCTAssertEqual(restored, original, "Authored spacing changed on reopen cycle \(cycle)")
+            attach(app.dialogs.firstMatch.screenshot(), name: "Blank paragraphs retained after reopen cycle \(cycle)")
+        }
     }
 
     private func launchPad() -> XCUIApplication {

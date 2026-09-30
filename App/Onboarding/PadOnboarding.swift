@@ -8,6 +8,12 @@ final class PadOnboarding {
         case intro, practice
     }
 
+    enum Control: Hashable {
+        case close, next, back, skip, done
+    }
+
+    @ObservationIgnored var focusedControl: Control?
+
     private let defaults: UserDefaults
     private static let completionKey = "pad.onboardingCompleted"
 
@@ -43,6 +49,16 @@ final class PadOnboarding {
     func startPractice() {
         guard isPresented else { return }
         stage = .practice
+    }
+
+    func showIntroduction() {
+        guard isPresented else { return }
+        stage = .intro
+    }
+
+    /// A changed global shortcut must be practiced again before completing.
+    func resetPractice() {
+        practiceCount = 0
     }
 
     /// Called by the application's actual global shortcut handler, not local key matching.

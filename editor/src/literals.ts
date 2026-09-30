@@ -17,10 +17,31 @@ const unsupported = new Set([
   "definition",
   "linkReference",
 ]);
-function containsUnsupported(node: Nodes): boolean {
+function containsUnsupported(node: Nodes, inline = false): boolean {
+  // Only a standalone break represents a spacer; inline HTML must remain literal.
+  if (
+    !inline &&
+    node.type === "html" &&
+    ["<br />", "<br>", "<br >", "<br/>"].includes(node.value.trim())
+  )
+    return false;
+  if (node.type === "paragraph" && node.children.length === 1) {
+    const child = node.children[0];
+    if (
+      child?.type === "html" &&
+      ["<br />", "<br>", "<br >", "<br/>"].includes(child.value.trim())
+    )
+      return false;
+  }
   return (
     unsupported.has(node.type) ||
-    ("children" in node && node.children.some(containsUnsupported))
+    ("children" in node &&
+      node.children.some((child) =>
+        containsUnsupported(
+          child,
+          inline || node.type === "paragraph" || node.type === "heading",
+        ),
+      ))
   );
 }
 

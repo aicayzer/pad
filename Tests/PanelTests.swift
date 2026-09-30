@@ -7,6 +7,34 @@ import Testing
 @MainActor
 @Suite(.serialized, .opensWindows)
 struct PanelTests {
+    @Test func hostingContentKeepsTheExplicitCompactWindowMinimum() async throws {
+        let suite = "pad-sizing-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.set(true, forKey: "pad.onboardingCompleted")
+        defaults.set("md", forKey: "pad.format")
+        let folder = FileManager.default.temporaryDirectory.appending(path: suite)
+        let document = PadDocument(defaults: defaults, defaultFolder: folder)
+        let initialWindows = Set(NSApp.windows.map(ObjectIdentifier.init))
+        document.newFile()
+        let panel = try #require(NSApp.windows.compactMap { $0 as? PadPanel }.first {
+            !initialWindows.contains(ObjectIdentifier($0))
+        })
+        defer {
+            document.close()
+            panel.contentView = nil
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        try await eventually("Markdown editor mounting") { document.markdownEditor?.isReady == true }
+        panel.contentView?.layoutSubtreeIfNeeded()
+        #expect(panel.contentMinSize.width == 520)
+        #expect(panel.contentMinSize.height >= 320)
+        panel.setContentSize(NSSize(width: 520, height: 540))
+        try await settle()
+        #expect(panel.frame.width == 520)
+        #expect(panel.contentMinSize.width == 520)
+    }
+
     // Run this suite separately from other window suites: AppKit has one key window per process.
     @Test func editorFocusSettingsAndDocumentLifecycle() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "pad-panel-\(UUID().uuidString)")

@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import KeyboardShortcuts
 import SwiftUI
 
@@ -53,12 +54,13 @@ final class PadPanel: NSPanel {
         // AppKit draws outside the window; a SwiftUI shadow gets clipped at the hosting bounds.
         hasShadow = true
         isMovableByWindowBackground = true
-        minSize = NSSize(width: 520, height: 320)
         contentView = NSHostingView(rootView: PadView(files: files, prepareTitleFocus: { [weak self] in
             guard let self else { return }
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
-        }).environment(files.appSettings ?? AppSettings()))
+        }).environment(files.appSettings ?? AppSettings())
+            // Hosting derives the native minimum from the content's constraints.
+            .frame(minWidth: 520, minHeight: 320))
         pendingEditorInput.attach(to: self)
         pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
@@ -122,9 +124,51 @@ final class PadPanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
+        if handleOnboardingNavigation(event) { return }
         if !files.onboarding.isPresented, files.currentFormat == .md, firstResponder !== pendingEditorInput,
            files.markdownEditor?.capturePendingInput(event) == true { return }
         super.sendEvent(event)
+    }
+
+    // Onboarding may be summoned as a nonactivating panel before SwiftUI has a
+    // focused control. Handle its navigation here, independently of button focus.
+    private func handleOnboardingNavigation(_ event: NSEvent) -> Bool {
+        guard files.onboarding.isPresented, event.type == .keyDown,
+              event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty else { return false }
+        let key = Int(event.keyCode)
+        guard [kVK_Return, kVK_LeftArrow, kVK_RightArrow, kVK_Space].contains(key) else { return false }
+        guard !event.isARepeat else { return true }
+        let shortcut = KeyboardShortcuts.getShortcut(for: .pad)
+        // A configured bare navigation key belongs to the real global-shortcut
+        // callback. It must never also navigate or finish on its local key-down.
+        if shortcut?.modifiers.isEmpty == true,
+           (key == kVK_Return && shortcut?.key == .return ||
+            key == kVK_LeftArrow && shortcut?.key == .leftArrow ||
+            key == kVK_RightArrow && shortcut?.key == .rightArrow ||
+            key == kVK_Space && shortcut?.key == .space) { return true }
+        switch key {
+        case kVK_Space:
+            // Editing-style focus keeps Tab navigation available independently of
+            // macOS's all-controls preference; Space activates that focused action.
+            switch files.onboarding.focusedControl {
+            case .close: files.close()
+            case .next: files.onboarding.startPractice()
+            case .back: files.onboarding.showIntroduction()
+            case .skip: files.finishOnboarding(includeExample: false)
+            case .done:
+                if files.onboarding.practiceCount > 0 { files.finishOnboarding(includeExample: true) }
+            case nil: return false
+            }
+        case kVK_LeftArrow: files.onboarding.showIntroduction()
+        case kVK_RightArrow: files.onboarding.startPractice()
+        default:
+            if files.onboarding.stage == .intro {
+                files.onboarding.startPractice()
+            } else if files.onboarding.practiceCount > 0 {
+                files.finishOnboarding(includeExample: true)
+            }
+        }
+        return true
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -213,7 +257,6 @@ final class PadPanel: NSPanel {
 private struct PadView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var files: PadDocument
     let prepareTitleFocus: () -> Void
     @State private var renaming = false
@@ -228,16 +271,13 @@ private struct PadView: View {
         ZStack {
             if files.onboarding.isPresented {
                 PadOnboardingView(onboarding: files.onboarding, shortcut: shortcut,
-                                  draftExplanation: onboardingDraftExplanation,
                                   onContinue: { files.finishOnboarding(includeExample: true) },
                                   onSkip: { files.finishOnboarding(includeExample: false) },
                                   onClose: { files.close() })
-                    .transition(.opacity)
             } else {
-                editorContent.transition(.opacity)
+                editorContent
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: files.onboarding.isPresented)
         .tint(settings.accentColor)
         .onAppear {
             let action = openSettings
@@ -249,13 +289,6 @@ private struct PadView: View {
         .onChange(of: files.onboarding.isPresented) { _, presented in
             if presented { editing = false; renaming = false; showingFormatting = false }
         }
-    }
-
-    private var onboardingDraftExplanation: String {
-        let lifetime = files.reusePeriod == .alwaysNew
-            ? "Unsaved drafts clear on the next opening."
-            : "Unsaved drafts clear after \(files.reusePeriod.title) away."
-        return lifetime + " Save automatically or Save keeps a file. Quitting clears unsaved drafts."
     }
 
     private var editorContent: some View {
@@ -285,6 +318,8 @@ private struct PadView: View {
                     Text(files.displayName)
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
+                        .frame(maxWidth: 220, alignment: .leading)
+                        .accessibilityIdentifier("documentTitle")
                         .help("Double-click to rename")
                         .onTapGesture(count: 2) {
                             editing = false
@@ -296,8 +331,14 @@ private struct PadView: View {
                         .simultaneousGesture(WindowDragGesture())
                 }
                 DevelopmentBadge()
+                    .fixedSize()
                 if files.isDirty { Circle().frame(width: 6, height: 6).foregroundStyle(.secondary) }
-                Spacer()
+                if showingFormatting, files.currentFormat == .md, let editor = files.markdownEditor {
+                    PadMarkdownToolbar(editor: editor)
+                        .frame(minWidth: 24, maxWidth: .infinity)
+                } else {
+                    Spacer(minLength: 0)
+                }
                 HStack(spacing: 2) {
                     if files.currentFormat == .md, let editor = files.markdownEditor {
                         Button {
@@ -321,8 +362,10 @@ private struct PadView: View {
                     .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
 
                 }
+                .fixedSize()
                 Button("Save") { files.save() }
                     .buttonStyle(PadToolbarButtonStyle(primary: true))
+                    .fixedSize()
             }
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .medium))
@@ -341,9 +384,6 @@ private struct PadView: View {
             VStack(spacing: 0) {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
-                        if showingFormatting {
-                            PadMarkdownToolbar(editor: editor)
-                        }
                         PadMarkdownEditorView(editor: editor)
                             .onChange(of: settings.accentColor, initial: true) {
                                 editor.accentOverride = NSColor(settings.accentColor)

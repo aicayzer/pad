@@ -50,14 +50,15 @@ for (const [name, input, canonical] of variants) {
   });
 }
 
-test("an empty paragraph is left out rather than written as html", async () => {
+test("an empty paragraph survives saving and reopening", async () => {
   const out = await withEditor("a\n\nb\n", (editor) => {
     const view = editor.ctx.get(editorViewCtx);
     const paragraph = view.state.schema.nodes.paragraph!;
     view.dispatch(view.state.tr.insert(3, paragraph.create()));
     return serialize(editor.ctx);
   });
-  expect(out).toBe("a\n\nb\n");
+  expect(out).toBe("a\n\n<br />\n\nb\n");
+  expect(await roundTrip(out)).toBe(out);
 });
 
 test("a document that is only an empty paragraph is written as nothing", async () => {

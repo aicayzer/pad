@@ -493,6 +493,36 @@ test("buffered input leaves active native composition untouched", async () =>
     const view = ctxOf(editor).get(editorViewCtx);
     Object.defineProperty(view, "composing", { get: () => true });
     expect(editor.insertText("uncommitted", 1)).toBe(false);
-    expect(editor.keyDown("Enter", "", false, false, false, false, 1)).toBe(false);
+    expect(editor.keyDown("Enter", "", false, false, false, false, 1)).toBe(
+      false,
+    );
     expect(editor.markdown()).toBe(null);
   }));
+
+test("authored spacing between list groups survives switching documents and reloading", async () => {
+  await withPadEditor(
+    "1. Example\n2. Another example\n\n- Another list\n- More items\n\n- [ ] Todo\n",
+    (editor) => {
+      const view = ctxOf(editor).get(editorViewCtx);
+      const paragraph = view.state.schema.nodes.paragraph!;
+      const positions: number[] = [];
+      view.state.doc.forEach((_, offset, index) => {
+        if (index > 0) positions.push(offset);
+      });
+      const transaction = view.state.tr;
+      for (const position of positions.reverse())
+        transaction.insert(position, paragraph.create());
+      view.dispatch(transaction);
+      const authored = view.state.doc.toJSON();
+      const saved = editor.markdown()!;
+      expect(saved).toContain("<br />");
+      editor.load("A different document.\n", 2);
+      editor.load(saved, 3);
+      expect(view.state.doc.toJSON()).toEqual(authored);
+      expect(editor.markdown()).toBeNull();
+      expect(editor.canonicalMarkdown()).toBe(saved);
+      editor.reload(saved, 3);
+      expect(view.state.doc.toJSON()).toEqual(authored);
+    },
+  );
+});
