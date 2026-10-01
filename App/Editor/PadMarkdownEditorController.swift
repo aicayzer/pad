@@ -352,7 +352,14 @@ final class PadMarkdownEditorController: NSObject {
         case "state":
             guard isReady else { return }
             if let receivedGeneration = message["generation"] as? Int, receivedGeneration != generation { return }
-            activeMarks = Set(message["marks"] as? [String] ?? [])
+            var active = Set(message["marks"] as? [String] ?? [])
+            if let block = message["block"] as? [String: Any], let type = block["type"] as? String,
+               type != "paragraph" {
+                active.insert(type)
+                if type == "heading", let level = block["level"] as? Int { active.insert("heading\(level)") }
+            }
+            if message["quoted"] as? Bool == true { active.insert("quote") }
+            activeMarks = active
         case "openLink":
             guard let href = message["href"] as? String, let url = URL(string: href),
                   let scheme = url.scheme?.lowercased(), ["https", "http", "mailto"].contains(scheme) else { return }

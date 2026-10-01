@@ -98,6 +98,8 @@ struct SettingsView: View {
                 }
             }
             Section("Appearance") {
+                Toggle("Show format switch", isOn: $settings.showFormatToggle)
+                    .accessibilityIdentifier("showFormatToggle")
                 Picker("Appearance", selection: $settings.appearance) {
                     ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0) }
                 }

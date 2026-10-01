@@ -10,11 +10,25 @@ import Testing
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = AppSettings(defaults: defaults)
+        #expect(settings.showFormatToggle)
         #expect(settings.showInDock)
         #expect(settings.menuBarItem)
         #expect(settings.menuBarIcon == .mark)
         #expect(settings.accent == .standard)
         #expect(settings.customAccent == "BEBAFC")
+    }
+
+    @Test func formatSwitchVisibilityPersistsIndependently() {
+        let suite = "pad-settings-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("txt", forKey: "pad.format")
+        let settings = AppSettings(defaults: defaults)
+        settings.showFormatToggle = false
+        #expect(!AppSettings(defaults: defaults).showFormatToggle)
+        #expect(defaults.string(forKey: "pad.format") == "txt")
+        settings.showFormatToggle = true
+        #expect(AppSettings(defaults: defaults).showFormatToggle)
     }
 
     @Test func appearancePreferencesPersistIndependently() {
