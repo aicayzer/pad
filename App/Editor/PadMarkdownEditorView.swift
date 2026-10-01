@@ -159,7 +159,7 @@ private struct PadFormattingGlyph: View {
             let dark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let color = NSColor(calibratedWhite: selected ? (dark ? 0.9 : 0.28) : 0.6, alpha: 1)
             if let text {
-                let fontSize: CGFloat = 16
+                let fontSize: CGFloat = 15
                 let base = NSFont.systemFont(ofSize: fontSize, weight: text == "H" ? .medium : .regular)
                 let font = base.fontDescriptor.withDesign(design).flatMap { NSFont(descriptor: $0, size: fontSize) } ?? base
                 let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])

@@ -33,6 +33,7 @@ final class PadPanel: NSPanel {
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
+    private lazy var errorBanner = PadErrorBanner(owner: self)
 
     var pendingEditorEventCount: Int { pendingEditorInput.eventCount }
 
@@ -62,6 +63,8 @@ final class PadPanel: NSPanel {
             guard let self else { return }
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
+        }, presentError: { [weak self] message in
+            self?.errorBanner.show(message)
         }).environment(files.appSettings ?? AppSettings())
             // Hosting derives the native minimum from the content's constraints.
             .frame(minWidth: 520, maxWidth: Self.maximumWidth, minHeight: 320))
@@ -74,7 +77,16 @@ final class PadPanel: NSPanel {
                                                name: NSWindow.willMoveNotification, object: self)
         NotificationCenter.default.addObserver(self, selector: #selector(windowMoved),
                                                name: NSWindow.didMoveNotification, object: self)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowResized),
+                                               name: NSWindow.didResizeNotification, object: self)
         center()
+    }
+
+    @objc private func windowResized() { errorBanner.show(files.error) }
+
+    override func orderOut(_ sender: Any?) {
+        errorBanner.hide()
+        super.orderOut(sender)
     }
 
     @objc private func windowWillMove() {
@@ -82,6 +94,7 @@ final class PadPanel: NSPanel {
     }
 
     @objc private func windowMoved() {
+        errorBanner.position()
         guard trackingWindowMove else { return }
         scheduleCenterSnap()
     }
@@ -272,6 +285,7 @@ final class PadPanel: NSPanel {
 
     override func becomeKey() {
         super.becomeKey()
+        errorBanner.show(files.error)
         files.settingsPresented = false
         guard !files.onboarding.isPresented else {
             files.isActive = false
@@ -318,10 +332,10 @@ private struct PadView: View {
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
     let prepareTitleFocus: () -> Void
+    let presentError: (String?) -> Void
     @State private var renaming = false
     @State private var titleDraft = ""
     @State private var renameWidth: CGFloat = 100
-    @State private var renameFocusRequest = 0
     @State private var renamedDocument: UUID?
     @FocusState private var editing: Bool
     @State private var shareAnchor = PadShareAnchor()
@@ -343,7 +357,9 @@ private struct PadView: View {
         .onAppear {
             let action = openSettings
             files.showSettings = { action() }
+            presentError(files.error)
         }
+        .onChange(of: files.error) { _, message in presentError(message) }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             shortcut = KeyboardShortcuts.getShortcut(for: .pad)
         }
@@ -377,10 +393,9 @@ private struct PadView: View {
                                     OverlaySearchField(placeholder: "Name", text: $titleDraft, fontSize: 14,
                                                        fontWeight: .semibold, selectsTextOnFocus: true,
                                                        isCurrent: { renaming && files.isActive && renamedDocument == files.documentID },
-                                                       submit: { commitRename(returnToEditor: true) },
+                                                       submit: commitRename,
                                                        dismiss: finishRename,
-                                                       blur: { commitRename(returnToEditor: false) })
-                                        .id(renameFocusRequest)
+                                                       blur: { renaming = false })
                                         .frame(width: min(renameWidth, max(40, titleSpace - 36)))
                                 }
                                 .frame(height: 22)
@@ -482,10 +497,10 @@ private struct PadView: View {
                 }
                 HStack(alignment: .bottom, spacing: 12) {
                     DevelopmentBadge().fixedSize()
-                    Text(files.error ?? files.notice ?? " ")
-                        .foregroundStyle(files.error == nil ? Color.secondary : Color.red)
+                    Text(files.notice ?? " ")
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityHidden(files.error == nil && files.notice == nil)
+                        .accessibilityHidden(files.notice == nil)
                     if settings.showFormatToggle {
                         Button(files.currentFormat.title) {
                             Task { await files.toggleFormat() }
@@ -540,14 +555,9 @@ private struct PadView: View {
         renaming = true
     }
 
-    private func commitRename(returnToEditor: Bool) {
+    private func commitRename() {
         guard renaming, renamedDocument == files.documentID else { return }
-        if files.rename(to: titleDraft) {
-            if returnToEditor { finishRename() } else { renaming = false }
-        } else if !returnToEditor {
-            prepareTitleFocus()
-            renameFocusRequest += 1
-        }
+        if files.rename(to: titleDraft) { finishRename() }
     }
 
     private func finishRename() {

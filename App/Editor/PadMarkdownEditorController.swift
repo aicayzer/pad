@@ -12,12 +12,12 @@ enum PadMarkdownEditorError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .composing: "Finish entering the current text before saving or closing the document."
-        case .notReady: "The Markdown editor is still loading. Please try again."
-        case .documentChanged: "The document changed before its text could be read. Please try again."
-        case .invalidResponse: "The Markdown editor could not return the document text. Your document has been kept open."
-        case .unavailable: "The Markdown editor is unavailable. Your document has been kept open."
-        case .script(let message): "The Markdown editor encountered a problem: \(message)"
+        case .composing: "Finish typing before saving or closing."
+        case .notReady: "The editor is still loading. Try again in a moment."
+        case .documentChanged: "Your text changed while it was being read. Try again."
+        case .invalidResponse: "Couldn’t read your text. Your document is still open."
+        case .unavailable: "The editor is unavailable. Your document is still open."
+        case .script: "The editor encountered a problem. Your document is still open."
         }
     }
 }
