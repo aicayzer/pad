@@ -77,7 +77,7 @@ private struct ErrorBannerContent: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+            .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 12))
             .accessibilityLabel("Error: \(message)")
     }
 }
