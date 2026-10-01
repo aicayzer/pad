@@ -39,7 +39,7 @@ struct PadMarkdownToolbar: View {
         Menu { headingCommands } label: {
             PadFormattingGlyph(text: "H", design: .rounded, selected: active(.heading))
         }
-        .modifier(PadFormattingControlStyle())
+        .modifier(PadFormattingControlFrame())
         .tint(active(.heading) ? .primary : .secondary)
         .help("Headings")
         .accessibilityLabel("Headings")
@@ -51,7 +51,7 @@ struct PadMarkdownToolbar: View {
         Menu { styleCommands } label: {
             PadFormattingGlyph(text: "I", design: .serif, selected: active(.bold) || active(.italic))
         }
-        .modifier(PadFormattingControlStyle())
+        .modifier(PadFormattingControlFrame())
         .tint(active(.bold) || active(.italic) ? .primary : .secondary)
         .help("Text style")
         .accessibilityLabel("Text style")
@@ -63,7 +63,7 @@ struct PadMarkdownToolbar: View {
             PadFormattingGlyph(symbol: active(.orderedList) ? "list.number" : "list.bullet",
                                selected: active(.bulletList) || active(.orderedList))
         }
-        .modifier(PadFormattingControlStyle())
+        .modifier(PadFormattingControlFrame())
         .tint(active(.bulletList) || active(.orderedList) ? .primary : .secondary)
         .help("Lists")
         .accessibilityLabel("Lists")
@@ -101,7 +101,7 @@ struct PadMarkdownToolbar: View {
             PadFormattingGlyph(symbol: "link", selected: active(.link), size: 13.5)
         }
         .buttonStyle(.plain)
-        .modifier(PadFormattingControlStyle())
+        .modifier(PadFormattingControlFrame())
         .help("Link (⌘K)")
         .accessibilityLabel("Link")
         .accessibilityValue(active(.link) ? "On" : "Off")
@@ -123,7 +123,7 @@ struct PadMarkdownToolbar: View {
             PadFormattingGlyph(symbol: "ellipsis")
         }
         .fixedSize()
-        .modifier(PadFormattingControlStyle())
+        .modifier(PadFormattingControlFrame())
         .tint(.secondary)
         .help("More formatting")
         .accessibilityLabel("More formatting")
@@ -143,7 +143,7 @@ struct PadMarkdownToolbar: View {
             PadFormattingGlyph(symbol: image, selected: active(command), size: size)
         }
         .buttonStyle(.plain)
-        .modifier(PadFormattingControlStyle())
+        .modifier(PadFormattingControlFrame())
         .help(title)
         .accessibilityLabel(title)
         .accessibilityValue(active(command) ? "On" : "Off")
@@ -204,15 +204,11 @@ private struct PadFormattingGlyph: View {
     }
 }
 
-private struct PadFormattingControlStyle: ViewModifier {
-    @State private var hovered = false
-
+private struct PadFormattingControlFrame: ViewModifier {
     func body(content: Content) -> some View {
         content
             .frame(width: 26, height: 28)
             .contentShape(Capsule())
-            .background(Color.primary.opacity(hovered ? 0.08 : 0), in: Capsule())
-            .onHover { hovered = $0 }
     }
 }
 

@@ -26,6 +26,10 @@ final class PadPanel: NSPanel {
     private let files: PadDocument
     private let quit: @MainActor () -> Void
     private var previousFrame: NSRect?
+    private static let maximumWidth: CGFloat = 1_200
+    private static let centerSnapDistance: CGFloat = 20
+    private var trackingWindowMove = false
+    private var pendingCenterSnap: DispatchWorkItem?
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
@@ -60,12 +64,58 @@ final class PadPanel: NSPanel {
             makeFirstResponder(pendingTitleInput)
         }).environment(files.appSettings ?? AppSettings())
             // Hosting derives the native minimum from the content's constraints.
-            .frame(minWidth: 520, minHeight: 320))
+            .frame(minWidth: 520, maxWidth: Self.maximumWidth, minHeight: 320))
+        maxSize = NSSize(width: Self.maximumWidth, height: CGFloat.greatestFiniteMagnitude)
         pendingEditorInput.attach(to: self)
         pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
                                                name: NSApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowWillMove),
+                                               name: NSWindow.willMoveNotification, object: self)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowMoved),
+                                               name: NSWindow.didMoveNotification, object: self)
         center()
+    }
+
+    @objc private func windowWillMove() {
+        trackingWindowMove = NSEvent.pressedMouseButtons & 1 != 0
+    }
+
+    @objc private func windowMoved() {
+        guard trackingWindowMove else { return }
+        scheduleCenterSnap()
+    }
+
+    private func scheduleCenterSnap() {
+        pendingCenterSnap?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            // Native dragging runs its own event loop. Wait until the mouse is
+            // released, so a pause during a drag never pulls the window away.
+            if NSEvent.pressedMouseButtons & 1 != 0 {
+                self.scheduleCenterSnap()
+                return
+            }
+            self.pendingCenterSnap = nil
+            self.trackingWindowMove = false
+            self.snapNearCenter()
+        }
+        pendingCenterSnap = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    private func snapNearCenter() {
+        guard isVisible, let screen else { return }
+        let visible = screen.visibleFrame
+        var target = frame
+        if abs(frame.midX - visible.midX) <= Self.centerSnapDistance {
+            target.origin.x = visible.midX - frame.width / 2
+        }
+        if abs(frame.midY - visible.midY) <= Self.centerSnapDistance {
+            target.origin.y = visible.midY - frame.height / 2
+        }
+        guard target.origin != frame.origin else { return }
+        setFrameOrigin(target.origin)
     }
 
     @objc private func applicationBecameActive() { requestEditorFocus() }
@@ -212,7 +262,10 @@ final class PadPanel: NSPanel {
             self.previousFrame = nil
         } else if let screen = screen ?? NSScreen.main {
             previousFrame = frame
-            setFrame(screen.visibleFrame.insetBy(dx: 24, dy: 24), display: true, animate: true)
+            var expanded = screen.visibleFrame.insetBy(dx: 24, dy: 24)
+            expanded.size.width = min(expanded.width, Self.maximumWidth)
+            expanded.origin.x = screen.visibleFrame.midX - expanded.width / 2
+            setFrame(expanded, display: true, animate: true)
         }
     }
 
