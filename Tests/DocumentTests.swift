@@ -724,7 +724,7 @@ import Testing
         files.format = .md
         files.newFile()
         #expect(files.displayName == "Untitled")
-        #expect(files.editableName.isEmpty)
+        #expect(files.editableName == "Untitled")
         #expect(files.rename(to: "Trip notes"))
         #expect(files.displayName == "Trip notes.md")
         #expect(files.editableName == "Trip notes")

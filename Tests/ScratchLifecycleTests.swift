@@ -183,7 +183,7 @@ import Testing
         #expect(document.documentID == identity)
         #expect(document.text == "retained draft")
         #expect(document.url == nil)
-        #expect(document.error?.contains("Could not read the editor") == true)
+        #expect(document.error == "Couldn’t read your text. Your document is still open. Try again.")
         #expect(try fixture.savedFiles().isEmpty)
     }
 
