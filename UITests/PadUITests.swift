@@ -3,6 +3,26 @@ import XCTest
 
 @MainActor
 final class PadUITests: XCTestCase {
+    func testRejectedRenameKeepsTitleAndReturnsTypingToEditor() {
+        let app = launchPad()
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        app.typeText("Original text")
+        app.typeKey("r", modifierFlags: .command)
+        let name = app.textFields["Name"].firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "Untitled")
+        app.typeText("Invalid/name")
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(app.staticTexts["Untitled"].firstMatch.waitForExistence(timeout: 5))
+        let finished = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: name)
+        XCTAssertEqual(XCTWaiter.wait(for: [finished], timeout: 5), .completed)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText(" still editable")
+        expectValue("Original text still editable", in: editor)
+    }
+
     func testSettingsPreservesScratchAndEditorAcceptsInput() throws {
         let app = launchPad()
         defer { app.terminate() }

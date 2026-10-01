@@ -13,16 +13,13 @@ final class ToolbarRefinementUITests: XCTestCase {
         app.typeText("Selected words")
         let title = app.staticTexts["documentTitle"].firstMatch
         let dirty = app.descendants(matching: .any)["unsavedIndicator"].firstMatch
-        XCTAssertTrue(dirty.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertGreaterThanOrEqual(dirty.frame.minX, title.frame.maxX)
-        XCTAssertLessThanOrEqual(dirty.frame.minX - title.frame.maxX, 7)
+        XCTAssertFalse(dirty.exists, "Drafts do not show a saved-file changes badge")
         title.doubleClick()
         let name = app.textFields["Name"].firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "Untitled")
+        XCTAssertFalse(app.staticTexts[".md"].exists, "Rename edits only the name")
         app.typeText("Small")
-        let ext = app.staticTexts[".md"].firstMatch
-        XCTAssertTrue(ext.exists)
-        XCTAssertLessThanOrEqual(ext.frame.minX - name.frame.maxX, 6)
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.staticTexts["Small.md"].firstMatch.waitForExistence(timeout: 5))
         app.typeKey("a", modifierFlags: .command)
@@ -34,8 +31,6 @@ final class ToolbarRefinementUITests: XCTestCase {
         let formatting = app.descendants(matching: .any)["markdownFormatting"].firstMatch
         XCTAssertEqual(formatting.frame.midX, app.dialogs.firstMatch.frame.midX, accuracy: 2)
         for level in 1...3 {
-            heading.hover()
-            attach(app.dialogs.firstMatch.screenshot(), name: "Heading hover \(level)")
             heading.click()
             let command = app.menuItems["Heading \(level)"].firstMatch
             XCTAssertTrue(command.waitForExistence(timeout: 5), app.debugDescription)
@@ -121,8 +116,8 @@ final class ToolbarRefinementUITests: XCTestCase {
                 XCTAssertEqual(formatting.frame.midX, window.frame.midX, accuracy: 2)
                 let title = app.staticTexts["documentTitle"].firstMatch
                 let dirty = app.descendants(matching: .any)["unsavedIndicator"].firstMatch
-                XCTAssertLessThan(dirty.frame.maxX, formatting.frame.minX)
-                XCTAssertLessThanOrEqual(dirty.frame.minX - title.frame.maxX, 7)
+                XCTAssertFalse(dirty.exists)
+                XCTAssertLessThan(title.frame.maxX, formatting.frame.minX)
                 XCTAssertTrue(app.buttons["Save"].firstMatch.isHittable)
                 XCTAssertLessThan(formatting.frame.maxX, toggle.frame.minX)
                 if width < 820 {
@@ -132,9 +127,8 @@ final class ToolbarRefinementUITests: XCTestCase {
                 title.doubleClick()
                 let field = app.textFields["Name"].firstMatch
                 XCTAssertTrue(field.waitForExistence(timeout: 5))
-                let ext = app.staticTexts[".md"].firstMatch
-                XCTAssertLessThan(ext.frame.maxX, formatting.frame.minX)
-                XCTAssertLessThanOrEqual(ext.frame.minX - field.frame.maxX, 6)
+                XCTAssertFalse(app.staticTexts[".md"].exists)
+                XCTAssertLessThan(field.frame.maxX, formatting.frame.minX)
                 app.typeKey(.escape, modifierFlags: [])
             }
             app.terminate()
