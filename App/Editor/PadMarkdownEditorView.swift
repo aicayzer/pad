@@ -25,7 +25,8 @@ struct PadMarkdownToolbar: View {
             .fixedSize()
             overflowMenu
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .controlSize(.small)
         .disabled(!editor.isReady)
@@ -36,10 +37,9 @@ struct PadMarkdownToolbar: View {
 
     private var headingMenu: some View {
         Menu { headingCommands } label: {
-            PadFormattingMenuLabel(selected: active(.heading)) {
-                PadFormattingGlyph(text: "H", design: .rounded, selected: active(.heading))
-            }
+            PadFormattingGlyph(text: "H", design: .rounded, selected: active(.heading))
         }
+        .modifier(PadFormattingControlStyle())
         .tint(active(.heading) ? .primary : .secondary)
         .help("Headings")
         .accessibilityLabel("Headings")
@@ -49,10 +49,9 @@ struct PadMarkdownToolbar: View {
 
     private var styleMenu: some View {
         Menu { styleCommands } label: {
-            PadFormattingMenuLabel(selected: active(.bold) || active(.italic)) {
-                PadFormattingGlyph(text: "I", design: .serif, selected: active(.bold) || active(.italic))
-            }
+            PadFormattingGlyph(text: "I", design: .serif, selected: active(.bold) || active(.italic))
         }
+        .modifier(PadFormattingControlStyle())
         .tint(active(.bold) || active(.italic) ? .primary : .secondary)
         .help("Text style")
         .accessibilityLabel("Text style")
@@ -61,11 +60,10 @@ struct PadMarkdownToolbar: View {
 
     private var listMenu: some View {
         Menu { listCommands } label: {
-            PadFormattingMenuLabel(selected: active(.bulletList) || active(.orderedList)) {
-                PadFormattingGlyph(symbol: active(.orderedList) ? "list.number" : "list.bullet",
-                                   selected: active(.bulletList) || active(.orderedList))
-            }
+            PadFormattingGlyph(symbol: active(.orderedList) ? "list.number" : "list.bullet",
+                               selected: active(.bulletList) || active(.orderedList))
         }
+        .modifier(PadFormattingControlStyle())
         .tint(active(.bulletList) || active(.orderedList) ? .primary : .secondary)
         .help("Lists")
         .accessibilityLabel("Lists")
@@ -102,7 +100,8 @@ struct PadMarkdownToolbar: View {
         Button { editor.showingLink = true } label: {
             PadFormattingGlyph(symbol: "link", selected: active(.link), size: 13.5)
         }
-        .buttonStyle(PadFormattingButtonStyle())
+        .buttonStyle(.plain)
+        .modifier(PadFormattingControlStyle())
         .help("Link (⌘K)")
         .accessibilityLabel("Link")
         .accessibilityValue(active(.link) ? "On" : "Off")
@@ -121,11 +120,10 @@ struct PadMarkdownToolbar: View {
             Divider()
             Menu("Lists") { listCommands }
         } label: {
-            PadFormattingMenuLabel {
-                PadFormattingGlyph(symbol: "ellipsis")
-            }
+            PadFormattingGlyph(symbol: "ellipsis")
         }
         .fixedSize()
+        .modifier(PadFormattingControlStyle())
         .tint(.secondary)
         .help("More formatting")
         .accessibilityLabel("More formatting")
@@ -144,7 +142,8 @@ struct PadMarkdownToolbar: View {
         Button { editor.format(command) } label: {
             PadFormattingGlyph(symbol: image, selected: active(command), size: size)
         }
-        .buttonStyle(PadFormattingButtonStyle())
+        .buttonStyle(.plain)
+        .modifier(PadFormattingControlStyle())
         .help(title)
         .accessibilityLabel(title)
         .accessibilityValue(active(command) ? "On" : "Off")
@@ -205,28 +204,14 @@ private struct PadFormattingGlyph: View {
     }
 }
 
-private struct PadFormattingMenuLabel<Content: View>: View {
-    var selected = false
-    @ViewBuilder let content: () -> Content
+private struct PadFormattingControlStyle: ViewModifier {
     @State private var hovered = false
 
-    var body: some View {
-        content()
-        .frame(width: 26, height: 28)
-        .background(Color.primary.opacity(hovered ? 0.08 : 0), in: Capsule())
-        .contentShape(Capsule())
-        .onHover { hovered = $0 }
-    }
-}
-
-struct PadFormattingButtonStyle: ButtonStyle {
-    @State private var hovered = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+    func body(content: Content) -> some View {
+        content
             .frame(width: 26, height: 28)
-            .background(Color.primary.opacity(hovered || configuration.isPressed ? 0.08 : 0), in: Capsule())
             .contentShape(Capsule())
+            .background(Color.primary.opacity(hovered ? 0.08 : 0), in: Capsule())
             .onHover { hovered = $0 }
     }
 }
