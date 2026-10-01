@@ -1,0 +1,81 @@
+import AppKit
+import SwiftUI
+
+struct PadPlainTextEditorView: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = PadPlainTextScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+
+        let editor = Self.makeTextView()
+        editor.isRichText = false
+        editor.importsGraphics = false
+        editor.allowsUndo = true
+        editor.drawsBackground = false
+        editor.font = .systemFont(ofSize: 15)
+        editor.textColor = .textColor
+        editor.isVerticallyResizable = true
+        editor.isHorizontallyResizable = false
+        editor.autoresizingMask = [.width]
+        editor.minSize = .zero
+        editor.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        editor.textContainer?.widthTracksTextView = true
+        editor.textContainer?.heightTracksTextView = false
+        editor.textContainerInset = NSSize(width: 0, height: 0)
+        editor.string = text
+        editor.delegate = context.coordinator
+        scroll.documentView = editor
+        return scroll
+    }
+
+    static func makeTextView() -> NSTextView {
+        let content = NSTextContentStorage()
+        let layout = PadTextSelectionLayoutManager()
+        content.addTextLayoutManager(layout)
+        let container = NSTextContainer()
+        layout.textContainer = container
+        return NSTextView(frame: .zero, textContainer: container)
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.text = $text
+        guard let editor = scroll.documentView as? NSTextView, editor.string != text else { return }
+        editor.string = text
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+        init(text: Binding<String>) { self.text = text }
+
+        func textDidChange(_ notification: Notification) {
+            guard let editor = notification.object as? NSTextView else { return }
+            text.wrappedValue = editor.string
+        }
+    }
+}
+
+final class PadPlainTextScrollView: NSScrollView {
+    override func tile() {
+        super.tile()
+        guard let editor = documentView as? NSTextView else { return }
+        // Empty space beneath a short document must remain part of the native editor.
+        editor.minSize = contentSize
+        if editor.frame.height < contentSize.height { editor.frame.size.height = contentSize.height }
+    }
+}
+
+final class PadTextSelectionLayoutManager: NSTextLayoutManager {
+    override func enumerateTextSegments(in textRange: NSTextRange, type: SegmentType,
+                                        options: SegmentOptions = [],
+                                        using block: (NSTextRange?, CGRect, CGFloat, NSTextContainer) -> Bool) {
+        // Selection segments extend continued lines to the container edge. Native painting
+        // should use the typographic bounds, just as Markdown's text-only highlights do.
+        super.enumerateTextSegments(in: textRange, type: type == .selection ? .standard : type,
+                                    options: options, using: block)
+    }
+}

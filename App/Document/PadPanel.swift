@@ -421,10 +421,9 @@ private struct PadView: View {
                             .onAppear { files.mountMarkdownEditor() }
                     }
                 } else {
-                    TextEditor(text: $files.text)
+                    PadPlainTextEditorView(text: $files.text)
+                        .id(files.documentID)
                         .background(EditorFocusMount())
-                        .font(.system(size: 15))
-                        .scrollContentBackground(.hidden)
                         .focused($editing)
                         .padding(10)
                 }
