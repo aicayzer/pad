@@ -128,9 +128,12 @@ struct PadOnboardingView: View {
             shortcutKey(compact: compact)
                 .padding(.bottom, compact ? 0 : 5)
 
-            Text(hasPracticed ? "Nice, it’s that simple." : "Show and hide with one shortcut.")
+            Text(hasPracticed ? "Nice, it’s that simple." : "Try your shortcut.")
                 .font(.system(size: compact ? 26 : 29, weight: .semibold))
                 .tracking(-0.7)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(height: compact ? 34 : 38)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier(hasPracticed ? "onboardingDone" : "onboardingPracticeTitle")
 
@@ -139,7 +142,8 @@ struct PadOnboardingView: View {
                 .foregroundStyle(.secondary)
                 .lineSpacing(4)
                 .frame(maxWidth: 350)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2)
+                .frame(height: compact ? 38 : 44)
                 .accessibilityIdentifier("onboardingPracticeExplanation")
         }
         .multilineTextAlignment(.center)
@@ -148,9 +152,9 @@ struct PadOnboardingView: View {
     }
 
     private var practiceExplanation: String {
-        if hasPracticed { return "Try it again, or choose Done to start writing." }
-        if shortcut == nil { return "No shortcut is set. Skip for now and add one in Settings." }
-        return "Try it now. You can change your shortcut anytime in Settings."
+        if hasPracticed { return "Try your shortcut again if you like.\nChoose Done when you’re ready to write." }
+        if shortcut == nil { return "No shortcut is set. Skip for now.\nYou can add one anytime in Settings." }
+        return "Show or hide PadPad with a key press.\nChange your shortcut anytime in Settings."
     }
 
     private func shortcutKey(compact: Bool) -> some View {
@@ -205,7 +209,7 @@ struct PadOnboardingView: View {
     private func secondaryButton(_ title: String, control: Control, identifier: String,
                                  action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .buttonStyle(OnboardingSecondaryButtonStyle(isFocused: focusedControl == control))
+            .buttonStyle(OnboardingSecondaryButtonStyle())
             .focusable(interactions: .edit)
             .focusEffectDisabled()
             .focused($focusedControl, equals: control)
@@ -247,8 +251,6 @@ private struct OnboardingPrimaryButtonStyle: ButtonStyle {
 }
 
 private struct OnboardingSecondaryButtonStyle: ButtonStyle {
-    let isFocused: Bool
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 12))
@@ -256,6 +258,5 @@ private struct OnboardingSecondaryButtonStyle: ButtonStyle {
             .padding(.horizontal, 10)
             .frame(height: 28)
             .opacity(configuration.isPressed ? 0.65 : 1)
-            .underline(isFocused, color: .secondary)
     }
 }
