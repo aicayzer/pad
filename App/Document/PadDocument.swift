@@ -834,8 +834,6 @@ final class PadDocument {
     @discardableResult
     func rename(to input: String) -> Bool {
         guard !isBusy else { return false }
-        operation = .transition
-        defer { operation = nil }
         do {
             let fileExtension = url?.pathExtension ?? currentFormat.rawValue
             let stem = try PadFilename.validatedStem(input)
@@ -865,6 +863,12 @@ final class PadDocument {
                     }
                 }
             } else {
+                let destination = folder.appending(path: name)
+                // Draft names refer to the configured save folder. Reject a
+                // collision now, while Save still guards against later races.
+                var attributes = stat()
+                let exists = destination.withUnsafeFileSystemRepresentation { lstat($0!, &attributes) == 0 }
+                guard !exists else { throw PadError.nameExists }
                 pendingName = stem
             }
             error = nil

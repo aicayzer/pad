@@ -557,13 +557,21 @@ private struct PadView: View {
 
     private func commitRename() {
         guard renaming, renamedDocument == files.documentID else { return }
-        if files.rename(to: titleDraft) { finishRename() }
+        // An unsuccessful attempt keeps the original name. End the attempt
+        // and let the banner explain it without trapping the field editor.
+        _ = files.rename(to: titleDraft)
+        finishRename()
     }
 
     private func finishRename() {
         renaming = false
         editing = files.isActive
-        if files.isActive { files.markdownEditor?.focus() }
+        // Let SwiftUI remove the native rename field before focusing WebKit.
+        // Focusing first can lose the new responder when that field unmounts.
+        DispatchQueue.main.async {
+            guard files.isActive, !renaming else { return }
+            files.markdownEditor?.focus()
+        }
     }
 
     private func actionIcon(_ symbol: String, label: String, verticalOffset: CGFloat,
