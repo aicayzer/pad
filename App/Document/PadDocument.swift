@@ -90,6 +90,7 @@ final class PadDocument {
     var isActive = false
     var settingsPresented = false
     var showSettings: @MainActor () -> Void = {}
+    private(set) var renameRequest = 0
     var error: String?
     private(set) var notice: String? {
         didSet {
@@ -824,6 +825,11 @@ final class PadDocument {
     }
 
     func expand() { panel?.toggleExpanded() }
+
+    func requestRename() {
+        guard isActive, !isBusy, !onboarding.isPresented else { return }
+        renameRequest += 1
+    }
 
     @discardableResult
     func rename(to input: String) -> Bool {

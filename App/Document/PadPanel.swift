@@ -241,6 +241,7 @@ final class PadPanel: NSPanel {
         if modifiers == .command {
             switch event.charactersIgnoringModifiers {
             case "w": files.close()
+            case "r": files.requestRename()
             case ",":
                 files.settingsPresented = true
                 files.showSettings()
@@ -344,6 +345,7 @@ private struct PadView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             shortcut = KeyboardShortcuts.getShortcut(for: .pad)
         }
+        .onChange(of: files.renameRequest) { _, _ in beginRename() }
         .onChange(of: files.onboarding.isPresented) { _, presented in
             if presented { editing = false; renaming = false; showingFormatting = false }
         }
@@ -360,7 +362,9 @@ private struct PadView: View {
                     HStack(spacing: 6) {
                         Button { files.close() } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 15))
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 14, height: 14)
                                 .frame(width: 22, height: 26)
                         }
                         .accessibilityLabel("Close PadPad")
@@ -373,7 +377,7 @@ private struct PadView: View {
                                                            guard renamedDocument == files.documentID else { return }
                                                            if files.rename(to: titleDraft) { finishRename() }
                                                        }, dismiss: finishRename, blur: { renaming = false })
-                                        .frame(width: min(titleWidth(titleDraft, weight: .regular) + 6, max(40, titleSpace - 36)))
+                                        .frame(width: min(max(100, titleWidth(titleDraft, weight: .regular) + 12), max(40, titleSpace - 36)))
                                     Text(".\(files.url?.pathExtension ?? files.currentFormat.rawValue)")
                                         .foregroundStyle(.secondary)
                                         .fixedSize()
@@ -387,15 +391,9 @@ private struct PadView: View {
                                     .lineLimit(1)
                                     .truncationMode(.middle)
                                     .accessibilityIdentifier("documentTitle")
-                                    .help("Double-click to rename")
+                                    .help("Rename (⌘R or double-click)")
                                     .fixedSize(horizontal: false, vertical: true)
-                                    .onTapGesture(count: 2) {
-                                        editing = false
-                                        titleDraft = files.editableName
-                                        renamedDocument = files.documentID
-                                        prepareTitleFocus()
-                                        renaming = true
-                                    }
+                                    .onTapGesture(count: 2, perform: beginRename)
                                     .simultaneousGesture(WindowDragGesture())
                             }
 
@@ -526,6 +524,15 @@ private struct PadView: View {
 
     private func titleWidth(_ text: String, weight: NSFont.Weight) -> CGFloat {
         (text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 14, weight: weight)]).width
+    }
+
+    private func beginRename() {
+        guard files.isActive, !files.isBusy, !files.onboarding.isPresented, !renaming else { return }
+        editing = false
+        titleDraft = files.editableName
+        renamedDocument = files.documentID
+        prepareTitleFocus()
+        renaming = true
     }
 
     private func finishRename() {
