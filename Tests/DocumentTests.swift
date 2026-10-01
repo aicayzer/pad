@@ -10,7 +10,7 @@ import Testing
         noticeDuration: Duration = .seconds(2),
         selectOpenFile: (@MainActor () async -> URL?)? = nil,
         selectSaveFile: (@MainActor (URL, String) async -> URL?)? = nil,
-        discardChanges: @escaping @MainActor () -> Bool = { false }
+        resolveUnsavedChanges: @escaping @MainActor () -> PadUnsavedChangesDecision = { .cancel }
     ) throws -> (PadDocument, URL, UserDefaults, () -> String?) {
         let root = FileManager.default.temporaryDirectory.appending(path: "pad-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -21,7 +21,7 @@ import Testing
         let files = PadDocument(defaults: defaults, defaultFolder: root,
                             presentsWindow: false, noticeDuration: noticeDuration, copyPath: { copiedPath = $0 },
                             selectOpenFile: selectOpenFile, selectSaveFile: selectSaveFile,
-                            discardChanges: discardChanges)
+                            resolveUnsavedChanges: resolveUnsavedChanges)
         return (files, root, defaults, { copiedPath })
     }
 
@@ -143,7 +143,7 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).count == 1)
     }
 
-    @Test func shortcutReopensCurrentDocumentWithinInterval() throws {
+    @Test func shortcutKeepsSavedDocumentPastDraftInterval() throws {
         let (files, root, _, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }
         let start = Date(timeIntervalSince1970: 1_790_113_017)
@@ -156,7 +156,8 @@ import Testing
         #expect(files.url == saved)
         files.close(now: start.addingTimeInterval(14 * 60))
         files.toggle(now: start.addingTimeInterval(29 * 60))
-        #expect(files.text.isEmpty)
+        #expect(files.text == "hello world")
+        #expect(files.url == saved)
         #expect(try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).count == 1)
     }
 
@@ -260,11 +261,11 @@ import Testing
         #expect(files.error != nil)
     }
 
-    @Test func savedScratchRequiresDiscardConfirmation() throws {
+    @Test func hidingSavedScratchRetainsEditsAndReplacementRequiresConfirmation() throws {
         let decision = PadDiscardDecision()
-        let (files, root, _, _) = try fixture(discardChanges: {
+        let (files, root, _, _) = try fixture(resolveUnsavedChanges: {
             decision.confirmations += 1
-            return decision.discard
+            return decision.discard ? .discard : .cancel
         })
         defer { try? FileManager.default.removeItem(at: root) }
         files.saveAutomatically = false
@@ -276,13 +277,84 @@ import Testing
         files.close()
         #expect(files.text == "unsaved edit")
         #expect(files.isDirty)
+        #expect(decision.confirmations == 0)
+        files.newFile()
         #expect(decision.confirmations == 1)
+        #expect(files.text == "unsaved edit")
         decision.discard = true
-        files.close()
+        #expect(files.canTerminate())
         #expect(decision.confirmations == 2)
         #expect(files.text == "saved scratch")
         #expect(files.url == saved)
         #expect(!files.isDirty)
+    }
+
+    @Test(arguments: [PadFormat.txt, .md], [false, true])
+    func hiddenFileEditsSurviveExpiryAndExternalChanges(_ format: PadFormat, _ opened: Bool) throws {
+        var prompts = 0
+        let (files, root, _, _) = try fixture(format: format, resolveUnsavedChanges: {
+            prompts += 1
+            return .cancel
+        })
+        defer { try? FileManager.default.removeItem(at: root) }
+        files.saveAutomatically = false
+        files.reusePeriod = .alwaysNew
+        let start = Date.now
+        if opened {
+            let source = root.appending(path: "opened.\(format.rawValue)")
+            try Data("original".utf8).write(to: source)
+            files.open(source)
+        } else {
+            files.text = "original"
+            files.save()
+        }
+        let saved = try #require(files.url)
+        let identity = files.documentID
+        files.text = "unsaved edits"
+        files.close(now: start)
+        files.showCurrent(now: start.addingTimeInterval(86_400))
+        #expect(files.url == saved)
+        #expect(files.documentID == identity)
+        #expect(files.text == "unsaved edits")
+        #expect(files.isDirty)
+        #expect(prompts == 0)
+        #expect(try String(contentsOf: saved, encoding: .utf8) == "original")
+        files.close(now: start)
+        try Data("external edit".utf8).write(to: saved)
+        files.toggle(now: start.addingTimeInterval(86_400))
+        #expect(files.text == "unsaved edits")
+        #expect(files.error == PadError.changed.localizedDescription)
+        #expect(prompts == 0)
+        #expect(try String(contentsOf: saved, encoding: .utf8) == "external edit")
+    }
+
+    @Test(arguments: ["new", "open", "quit"], [false, true])
+    func saveDecisionProtectsFileOnDestructiveTransitions(_ action: String, _ conflicting: Bool) throws {
+        let (files, root, _, _) = try fixture(resolveUnsavedChanges: { .save })
+        defer { try? FileManager.default.removeItem(at: root) }
+        files.saveAutomatically = false
+        files.text = "original"
+        files.save()
+        let saved = try #require(files.url)
+        let other = root.appending(path: "other.txt")
+        try Data("other".utf8).write(to: other)
+        files.text = "latest edit"
+        if conflicting { try Data("external edit".utf8).write(to: saved) }
+        switch action {
+        case "new": files.newFile()
+        case "open": files.open(other)
+        default: #expect(files.canTerminate() == !conflicting)
+        }
+        #expect(try String(contentsOf: saved, encoding: .utf8) == (conflicting ? "external edit" : "latest edit"))
+        if conflicting {
+            #expect(files.url == saved)
+            #expect(files.text == "latest edit")
+            #expect(files.isDirty)
+            #expect(files.error == PadError.changed.localizedDescription)
+        } else {
+            #expect(!files.isDirty)
+            #expect(files.error == nil)
+        }
     }
 
     @Test func pendingSaveAsGuardsDocumentAndSavesTheRequestedSnapshot() async throws {
@@ -384,13 +456,13 @@ import Testing
 
     @Test func discardPromptPreventsReentrantTransitions() throws {
         let decision = PadDiscardDecision()
-        let (files, root, _, _) = try fixture(discardChanges: {
+        let (files, root, _, _) = try fixture(resolveUnsavedChanges: {
             decision.confirmations += 1
             decision.current?.newFile()
             decision.current?.close()
             decision.current?.save()
             #expect(decision.current?.canTerminate() == false)
-            return false
+            return .cancel
         })
         decision.current = files
         defer { try? FileManager.default.removeItem(at: root) }
