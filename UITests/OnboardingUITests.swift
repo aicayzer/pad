@@ -25,6 +25,7 @@ final class OnboardingUITests: XCTestCase {
         let practice = element("onboardingPractice", in: app)
         XCTAssertTrue(practice.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(element("onboardingDone", in: app).exists)
+        XCTAssertTrue(app.staticTexts["Try your shortcut."].exists)
         let finish = app.buttons["onboardingContinue"].firstMatch
         XCTAssertTrue(finish.exists)
         XCTAssertEqual(finish.label, "Done")
@@ -34,6 +35,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(practice.exists, "Return and Right must not bypass shortcut practice")
         XCTAssertFalse(app.buttons["documentFormat"].exists)
         attach(app.dialogs.firstMatch.screenshot(), name: "Shortcut practice keeps Done visible and disabled")
+        let explanationFrame = element("onboardingPracticeExplanation", in: app).frame
         let shortcut = element("onboardingShortcut", in: app)
         XCTAssertTrue(shortcut.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(shortcut.label.contains("⌃⌥⇧⌘P") ||
@@ -44,6 +46,12 @@ final class OnboardingUITests: XCTestCase {
         expectValue("Practiced 1 times", in: shortcut)
         let done = element("onboardingDone", in: app)
         XCTAssertTrue(done.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(done.label, "Nice, it’s that simple.")
+        let practicedFrame = element("onboardingPracticeExplanation", in: app).frame
+        XCTAssertEqual(practicedFrame.minY, explanationFrame.minY, accuracy: 1,
+                       "Shortcut practice must retain the description position")
+        XCTAssertEqual(practicedFrame.height, explanationFrame.height, accuracy: 1,
+                       "Both shortcut practice descriptions must occupy two lines")
         XCTAssertTrue(practice.exists, "Practicing must leave the onboarding visible")
         XCTAssertFalse(app.buttons["documentFormat"].exists, "The editor must not appear before Continue")
         attach(app.dialogs.firstMatch.screenshot(), name: "Real global shortcut acknowledged in native onboarding")

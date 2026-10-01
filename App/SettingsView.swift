@@ -98,8 +98,6 @@ struct SettingsView: View {
                 }
             }
             Section("Appearance") {
-                Toggle("Show format switch", isOn: $settings.showFormatToggle)
-                    .accessibilityIdentifier("showFormatToggle")
                 Picker("Appearance", selection: $settings.appearance) {
                     ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0) }
                 }
@@ -123,8 +121,18 @@ struct SettingsView: View {
     }
 
     private var files: some View {
+        @Bindable var settings = settings
         @Bindable var document = document
         return Form {
+            Section("Format") {
+                Picker("Default format", selection: $document.format) {
+                    Text("Markdown (.md)").tag(PadFormat.md)
+                    Text("Plain text (.txt)").tag(PadFormat.txt)
+                }
+                .tint(.primary)
+                Toggle("Show format switch", isOn: $settings.showFormatToggle)
+                    .accessibilityIdentifier("showFormatToggle")
+            }
             Section {
                 Toggle("Save automatically", isOn: $document.saveAutomatically)
                 Picker("Draft lifetime", selection: $document.reusePeriod) {
@@ -138,11 +146,6 @@ struct SettingsView: View {
                 Text(draftExplanation)
             }
             Section {
-                Picker("Default format", selection: $document.format) {
-                    Text("Markdown (.md)").tag(PadFormat.md)
-                    Text("Plain text (.txt)").tag(PadFormat.txt)
-                }
-                .tint(.primary)
                 LabeledContent("Save location") {
                     Text(document.folder.lastPathComponent).foregroundStyle(.secondary).lineLimit(1).help(document.folder.path)
                     Button("Choose…") { Task { await document.chooseFolder(parent: settingsWindow) } }

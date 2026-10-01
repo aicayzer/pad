@@ -299,6 +299,7 @@ final class PadDocument {
 
     func installShortcut() {
         KeyboardShortcuts.onKeyDown(for: .pad) { [weak self] in self?.handleGlobalShortcut() }
+        KeyboardShortcuts.onKeyUp(for: .pad) { [weak self] in self?.onboarding.releaseShortcut() }
     }
 
     /// Rehearsal advances only on an actual registered global-shortcut event.

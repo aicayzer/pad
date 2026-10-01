@@ -128,26 +128,22 @@ struct PadOnboardingView: View {
             shortcutKey(compact: compact)
                 .padding(.bottom, compact ? 0 : 5)
 
-            HStack(spacing: 8) {
-                if hasPracticed {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: compact ? 19 : 22))
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                }
-                Text(hasPracticed ? "You're ready." : "One gesture away.")
-                    .font(.system(size: compact ? 26 : 29, weight: .semibold))
-                    .tracking(-0.7)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier(hasPracticed ? "onboardingDone" : "onboardingPracticeTitle")
-            }
+            Text(hasPracticed ? "Nice, it’s that simple." : "Try your shortcut.")
+                .font(.system(size: compact ? 26 : 29, weight: .semibold))
+                .tracking(-0.7)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(height: compact ? 34 : 38)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier(hasPracticed ? "onboardingDone" : "onboardingPracticeTitle")
 
             Text(practiceExplanation)
                 .font(.system(size: compact ? 12 : 14))
                 .foregroundStyle(.secondary)
                 .lineSpacing(4)
                 .frame(maxWidth: 350)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2)
+                .frame(height: compact ? 38 : 44)
                 .accessibilityIdentifier("onboardingPracticeExplanation")
         }
         .multilineTextAlignment(.center)
@@ -156,23 +152,25 @@ struct PadOnboardingView: View {
     }
 
     private var practiceExplanation: String {
-        if hasPracticed { return "Try it again, or choose Done to start writing." }
-        if shortcut == nil { return "No shortcut is set. Skip for now and add one in Settings." }
-        return "Use your shortcut to bring PadPad back."
+        if hasPracticed { return "Try your shortcut again if you like.\nChoose Done when you’re ready to write." }
+        if shortcut == nil { return "No shortcut is set. Skip for now.\nYou can add one anytime in Settings." }
+        return "Show or hide PadPad with a key press.\nChange your shortcut anytime in Settings."
     }
 
     private func shortcutKey(compact: Bool) -> some View {
         Text(shortcut?.description ?? "No shortcut set")
             .font(.system(size: shortcut == nil ? 15 : 25, weight: .medium))
             .tracking(shortcut == nil ? 0 : 1.5)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(onboarding.shortcutPressed ? Color.white : Color.secondary)
             .frame(minWidth: 146, minHeight: compact ? 48 : 74)
             .padding(.horizontal, 22)
-            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+            .background(onboarding.shortcutPressed ? Color.black.opacity(0.8) : Color.primary.opacity(0.035),
+                        in: RoundedRectangle(cornerRadius: 10))
             .overlay {
                 RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(.primary.opacity(0.12), lineWidth: 1)
             }
+            .animation(.easeOut(duration: 0.1), value: onboarding.shortcutPressed)
             .accessibilityLabel(shortcut.map { "Global shortcut: \($0.description)" } ?? "No global shortcut configured")
             .accessibilityValue(hasPracticed ? "Practiced \(onboarding.practiceCount) times" : "Not yet practiced")
             .accessibilityIdentifier("onboardingShortcut")
@@ -211,7 +209,7 @@ struct PadOnboardingView: View {
     private func secondaryButton(_ title: String, control: Control, identifier: String,
                                  action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .buttonStyle(OnboardingSecondaryButtonStyle(isFocused: focusedControl == control))
+            .buttonStyle(OnboardingSecondaryButtonStyle())
             .focusable(interactions: .edit)
             .focusEffectDisabled()
             .focused($focusedControl, equals: control)
@@ -253,14 +251,12 @@ private struct OnboardingPrimaryButtonStyle: ButtonStyle {
 }
 
 private struct OnboardingSecondaryButtonStyle: ButtonStyle {
-    let isFocused: Bool
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 12))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .background(.primary.opacity(isFocused || configuration.isPressed ? 0.06 : 0), in: RoundedRectangle(cornerRadius: 6))
+            .opacity(configuration.isPressed ? 0.65 : 1)
     }
 }
