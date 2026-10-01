@@ -172,13 +172,13 @@ private struct PadFormattingGlyph: View {
             let color = NSColor(calibratedWhite: selected ? (dark ? 0.9 : 0.28) : 0.6, alpha: 1)
             if let text {
                 let fontSize: CGFloat = 18
-                let base = NSFont.systemFont(ofSize: fontSize, weight: text == "H" ? .semibold : .medium)
+                let base = NSFont.systemFont(ofSize: fontSize, weight: text == "H" ? .medium : .regular)
                 let font = base.fontDescriptor.withDesign(design).flatMap { NSFont(descriptor: $0, size: fontSize) } ?? base
                 let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
                 let extent = string.size()
                 // Align the visible capital, rather than its line-height box.
                 string.draw(at: NSPoint(x: (rect.width - extent.width) / 2,
-                                        y: (rect.height - font.capHeight) / 2 + font.descender))
+                                        y: (rect.height - font.capHeight) / 2 + font.descender - (text == "I" ? 0.5 : 0)))
             } else {
                 let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: .medium)
                     .applying(NSImage.SymbolConfiguration(paletteColors: [.black]))
