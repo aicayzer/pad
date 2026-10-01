@@ -298,87 +298,106 @@ private struct PadView: View {
 
     private var editorContent: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Button { files.close() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
-                        .frame(width: 22, height: 26)
-                }
-                .accessibilityLabel("Close PadPad")
-                if renaming {
-                    HStack(spacing: 2) {
-                        OverlaySearchField(placeholder: "Name", text: $titleDraft, fontSize: 14,
-                                           isCurrent: { renaming && files.isActive && renamedDocument == files.documentID },
-                                           submit: {
-                                               guard renamedDocument == files.documentID else { return }
-                                               if files.rename(to: titleDraft) { finishRename() }
-                                           }, dismiss: finishRename, blur: { renaming = false })
-                        Text(".\(files.url?.pathExtension ?? files.currentFormat.rawValue)")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 6)
-                    .frame(width: 220, height: 24)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 5))
-                } else {
-                    Text(files.displayName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .lineLimit(1)
-                        .frame(maxWidth: 220, alignment: .leading)
-                        .accessibilityIdentifier("documentTitle")
-                        .help("Double-click to rename")
-                        .onTapGesture(count: 2) {
-                            editing = false
-                            titleDraft = files.editableName
-                            renamedDocument = files.documentID
-                            prepareTitleFocus()
-                            renaming = true
+            GeometryReader { geometry in
+                let centerWidth: CGFloat = showingFormatting && files.currentFormat == .md
+                    ? (geometry.size.width >= 820 ? 280 : geometry.size.width >= 700 ? 144 : 36) : 0
+                let sideWidth = (geometry.size.width - centerWidth) / 2 - 12
+                let titleSpace = max(40, sideWidth - 88)
+                ZStack {
+                    HStack(spacing: 6) {
+                        Button { files.close() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 15))
+                                .frame(width: 22, height: 26)
                         }
-                        .simultaneousGesture(WindowDragGesture())
-                }
-                DevelopmentBadge()
-                    .fixedSize()
-                if files.isDirty { Circle().frame(width: 6, height: 6).foregroundStyle(.secondary) }
-                if showingFormatting, files.currentFormat == .md, let editor = files.markdownEditor {
-                    PadMarkdownToolbar(editor: editor)
-                        .frame(minWidth: 24, maxWidth: .infinity)
-                } else {
-                    Spacer(minLength: 0)
-                }
-                HStack(spacing: 2) {
-                    if files.currentFormat == .md, let editor = files.markdownEditor {
-                        Button {
-                            showingFormatting.toggle()
-                            editor.focus()
-                        } label: {
-                            Image(systemName: "textformat").frame(width: 16)
-                        }
-                        .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
-                        .accessibilityLabel("Formatting")
-                        .accessibilityIdentifier("formattingToggle")
-                        .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
-                        .accessibilityAddTraits(showingFormatting ? .isSelected : [])
-                        .help(showingFormatting ? "Hide formatting" : "Show formatting")
-                        .disabled(!editor.isReady)
-                        .modifier(PadMarkdownLinkPresenter(editor: editor))
-                    }
-                    actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
-                        files.share(from: shareAnchor.view)
-                    }
-                    .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
+                        .accessibilityLabel("Close PadPad")
+                        HStack(spacing: 5) {
+                            if renaming {
+                                HStack(spacing: 2) {
+                                    OverlaySearchField(placeholder: "Name", text: $titleDraft, fontSize: 14,
+                                                       isCurrent: { renaming && files.isActive && renamedDocument == files.documentID },
+                                                       submit: {
+                                                           guard renamedDocument == files.documentID else { return }
+                                                           if files.rename(to: titleDraft) { finishRename() }
+                                                       }, dismiss: finishRename, blur: { renaming = false })
+                                        .frame(width: min(titleWidth(titleDraft, weight: .regular) + 6, max(40, titleSpace - 36)))
+                                    Text(".\(files.url?.pathExtension ?? files.currentFormat.rawValue)")
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize()
+                                }
+                                .padding(.horizontal, 6)
+                                .frame(height: 24)
+                                .background(.background, in: RoundedRectangle(cornerRadius: 5))
+                            } else {
+                                Text(files.displayName)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .accessibilityIdentifier("documentTitle")
+                                    .help("Double-click to rename")
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .onTapGesture(count: 2) {
+                                        editing = false
+                                        titleDraft = files.editableName
+                                        renamedDocument = files.documentID
+                                        prepareTitleFocus()
+                                        renaming = true
+                                    }
+                                    .simultaneousGesture(WindowDragGesture())
+                            }
 
+                            if files.isDirty {
+                                Circle().frame(width: 6, height: 6).foregroundStyle(.secondary)
+                                    .accessibilityLabel("Unsaved changes")
+                                    .accessibilityIdentifier("unsavedIndicator")
+                            }
+                        }
+                        .frame(maxWidth: titleSpace + 12, alignment: .leading)
+                        .fixedSize(horizontal: true, vertical: false)
+                        DevelopmentBadge().fixedSize()
+                        Spacer(minLength: 0)
+                        HStack(spacing: 2) {
+                            if files.currentFormat == .md, let editor = files.markdownEditor {
+                                Button {
+                                    showingFormatting.toggle()
+                                    editor.focus()
+                                } label: {
+                                    Image(systemName: "textformat").frame(width: 16)
+                                }
+                                .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
+                                .accessibilityLabel("Formatting")
+                                .accessibilityIdentifier("formattingToggle")
+                                .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
+                                .accessibilityAddTraits(showingFormatting ? .isSelected : [])
+                                .help(showingFormatting ? "Hide formatting" : "Show formatting")
+                                .disabled(!editor.isReady)
+                                .modifier(PadMarkdownLinkPresenter(editor: editor))
+                            }
+                            actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
+                                files.share(from: shareAnchor.view)
+                            }
+                            .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
+
+                        }
+                        .fixedSize()
+                        Button("Save") { files.save() }
+                            .buttonStyle(PadToolbarButtonStyle(primary: true))
+                            .fixedSize()
+                    }
+                    .padding(.leading, 8)
+                    .padding(.trailing, 10)
+                    if showingFormatting, files.currentFormat == .md, let editor = files.markdownEditor {
+                        PadMarkdownToolbar(editor: editor)
+                            .frame(width: centerWidth)
+                    }
                 }
-                .fixedSize()
-                Button("Save") { files.save() }
-                    .buttonStyle(PadToolbarButtonStyle(primary: true))
-                    .fixedSize()
+                .frame(width: geometry.size.width, height: 38)
             }
+            .frame(height: 38)
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(.secondary)
             .labelStyle(.iconOnly)
-            .padding(.leading, 8)
-            .padding(.trailing, 10)
-            .frame(height: 38)
             .background {
                 Color.clear
                     .contentShape(Rectangle())
@@ -401,10 +420,9 @@ private struct PadView: View {
                             .onAppear { files.mountMarkdownEditor() }
                     }
                 } else {
-                    TextEditor(text: $files.text)
+                    PadPlainTextEditorView(text: $files.text)
+                        .id(files.documentID)
                         .background(EditorFocusMount())
-                        .font(.system(size: 15))
-                        .scrollContentBackground(.hidden)
                         .focused($editing)
                         .padding(10)
                 }
@@ -413,14 +431,16 @@ private struct PadView: View {
                         .foregroundStyle(files.error == nil ? Color.secondary : Color.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityHidden(files.error == nil && files.notice == nil)
-                    Button(files.currentFormat.title) {
-                        Task { await files.toggleFormat() }
+                    if settings.showFormatToggle {
+                        Button(files.currentFormat.title) {
+                            Task { await files.toggleFormat() }
+                        }
+                        .buttonStyle(PadFormatButtonStyle())
+                        .accessibilityIdentifier("documentFormat")
+                        .accessibilityLabel(files.currentFormat == .md ? "Markdown" : "Plain text")
+                        .accessibilityValue(files.currentFormat.title)
+                        .help(files.currentFormat == .md ? "Switch to plain text" : "Switch to Markdown")
                     }
-                    .buttonStyle(PadFormatButtonStyle())
-                    .accessibilityIdentifier("documentFormat")
-                    .accessibilityLabel(files.currentFormat == .md ? "Markdown" : "Plain text")
-                    .accessibilityValue(files.currentFormat.title)
-                    .help(files.currentFormat == .md ? "Switch to plain text" : "Switch to Markdown")
                 }
                 .padding(.leading, 18)
                 .padding(.trailing, 10)
@@ -449,6 +469,10 @@ private struct PadView: View {
                 renaming = false
             }
         }
+    }
+
+    private func titleWidth(_ text: String, weight: NSFont.Weight) -> CGFloat {
+        (text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 14, weight: weight)]).width
     }
 
     private func finishRename() {

@@ -6,6 +6,43 @@ import WebKit
 @MainActor
 @Suite(.serialized, .opensWindows)
 struct MarkdownBridgeTests {
+    @Test func toolbarStateIncludesHeadingListsAndQuotesAndRepeatedHeadingReturnsToBody() async throws {
+        let editor = PadMarkdownEditorController()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 500, height: 400),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = editor.webView
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        editor.load("Selected words", documentID: UUID())
+        try await ready(editor)
+        for level in 1...3 {
+            editor.format(.heading, argument: String(level))
+            _ = try await editor.snapshot()
+            try await toolbarState(editor, contains: "heading\(level)", active: true)
+            #expect(editor.activeMarks.contains("heading"))
+            editor.format(.heading, argument: String(level))
+            _ = try await editor.snapshot()
+            try await toolbarState(editor, contains: "heading", active: false)
+        }
+        for command in [PadMarkdownFormatCommand.bulletList, .orderedList, .quote] {
+            editor.format(command)
+            _ = try await editor.snapshot()
+            try await toolbarState(editor, contains: command.rawValue, active: true)
+            editor.format(command)
+            _ = try await editor.snapshot()
+            try await toolbarState(editor, contains: command.rawValue, active: false)
+        }
+    }
+
+    private func toolbarState(_ editor: PadMarkdownEditorController, contains value: String, active: Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while editor.activeMarks.contains(value) != active, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(editor.activeMarks.contains(value) == active)
+    }
+
     @Test func sourcePreservationFormattingReplacementAndSnapshotFailure() async throws {
         let editor = PadMarkdownEditorController()
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 500, height: 400),

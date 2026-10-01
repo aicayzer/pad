@@ -9,6 +9,7 @@ final class AppSettings {
     var showInDock: Bool { didSet { defaults.set(showInDock, forKey: "showInDock"); if !defersActivationPolicy { applyActivationPolicy() } } }
     var menuBarItem: Bool { didSet { defaults.set(menuBarItem, forKey: "menuBarItem") } }
     var menuBarIcon: MenuBarIcon { didSet { defaults.set(menuBarIcon.rawValue, forKey: "menuBarIcon") } }
+    var showFormatToggle: Bool { didSet { defaults.set(showFormatToggle, forKey: "showFormatToggle") } }
     var appearance: AppearanceChoice { didSet { defaults.set(appearance.rawValue, forKey: "appearance"); applyAppearance() } }
     var accent: AccentChoice { didSet { defaults.set(accent.rawValue, forKey: "accent") } }
     var customAccent: String { didSet { defaults.set(customAccent, forKey: "customAccent") } }
@@ -28,6 +29,7 @@ final class AppSettings {
         showInDock = defaults.object(forKey: "showInDock") == nil ? true : defaults.bool(forKey: "showInDock")
         menuBarItem = defaults.object(forKey: "menuBarItem") == nil ? true : defaults.bool(forKey: "menuBarItem")
         menuBarIcon = MenuBarIcon(rawValue: defaults.string(forKey: "menuBarIcon") ?? "") ?? .mark
+        showFormatToggle = defaults.object(forKey: "showFormatToggle") == nil ? true : defaults.bool(forKey: "showFormatToggle")
         appearance = AppearanceChoice(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
         accent = AccentChoice(rawValue: defaults.string(forKey: "accent") ?? "") ?? .standard
         customAccent = defaults.string(forKey: "customAccent") ?? "BEBAFC"
