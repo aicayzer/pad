@@ -13,13 +13,13 @@ struct PadMarkdownToolbar: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 1) {
+            HStack(spacing: 4) {
                 headingMenu
                 styleMenu
                 linkButton
                 formatButton("Inline code", image: "chevron.left.forwardslash.chevron.right", command: .code)
-                formatButton("Code block", image: "curlybraces", command: .codeBlock, size: 11.5)
-                formatButton("Quote", image: "text.quote", command: .quote, size: 11.5)
+                formatButton("Code block", image: "curlybraces", command: .codeBlock, size: 13.5)
+                formatButton("Quote", image: "text.quote", command: .quote, size: 13.5)
                 listMenu
             }
             .fixedSize()
@@ -100,7 +100,7 @@ struct PadMarkdownToolbar: View {
 
     private var linkButton: some View {
         Button { editor.showingLink = true } label: {
-            PadFormattingGlyph(symbol: "link", selected: active(.link), size: 11.5)
+            PadFormattingGlyph(symbol: "link", selected: active(.link), size: 13.5)
         }
         .buttonStyle(PadFormattingButtonStyle())
         .help("Link (⌘K)")
@@ -140,7 +140,7 @@ struct PadMarkdownToolbar: View {
         Toggle(title, isOn: Binding(get: { active(command) }, set: { _ in editor.format(command) }))
     }
 
-    private func formatButton(_ title: String, image: String, command: PadMarkdownFormatCommand, size: CGFloat = 12) -> some View {
+    private func formatButton(_ title: String, image: String, command: PadMarkdownFormatCommand, size: CGFloat = 14) -> some View {
         Button { editor.format(command) } label: {
             PadFormattingGlyph(symbol: image, selected: active(command), size: size)
         }
@@ -152,35 +152,54 @@ struct PadMarkdownToolbar: View {
     }
 }
 
-// Native borderless menus recolor template images. Original images keep menus and
-// buttons in the same adaptive gray, including when the editor selection changes.
+// Flatten every glyph into the same monochrome image so native menus and
+// ordinary buttons cannot apply different symbol palettes or accent colors.
 private struct PadFormattingGlyph: View {
     var symbol: String?
     var text: String?
     var design: NSFontDescriptor.SystemDesign = .default
     var selected = false
-    var size: CGFloat = 12
+    var size: CGFloat = 14
 
     var body: some View {
-        Image(nsImage: image).renderingMode(.original).frame(height: 16)
+        Image(nsImage: image).renderingMode(.original).frame(width: 22, height: 22)
     }
 
     private var image: NSImage {
-        let color = selected ? NSColor.labelColor.withAlphaComponent(0.82) : NSColor.secondaryLabelColor
-        if let text {
-            let base = NSFont.systemFont(ofSize: size, weight: text == "H" ? .semibold : .medium)
-            let font = base.fontDescriptor.withDesign(design).flatMap { NSFont(descriptor: $0, size: size) } ?? base
-            let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
-            let extent = string.size()
-            return NSImage(size: NSSize(width: ceil(extent.width), height: ceil(extent.height)), flipped: false) { rect in
-                string.draw(at: NSPoint(x: (rect.width - extent.width) / 2, y: 0))
-                return true
+        let canvas = NSSize(width: 22, height: 22)
+        let image = NSImage(size: canvas, flipped: false) { rect in
+            let dark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let color = NSColor(calibratedWhite: selected ? (dark ? 0.9 : 0.28) : 0.6, alpha: 1)
+            if let text {
+                let fontSize: CGFloat = 18
+                let base = NSFont.systemFont(ofSize: fontSize, weight: text == "H" ? .semibold : .medium)
+                let font = base.fontDescriptor.withDesign(design).flatMap { NSFont(descriptor: $0, size: fontSize) } ?? base
+                let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
+                let extent = string.size()
+                // Align the visible capital, rather than its line-height box.
+                string.draw(at: NSPoint(x: (rect.width - extent.width) / 2,
+                                        y: (rect.height - font.capHeight) / 2 + font.descender))
+            } else {
+                let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: .medium)
+                    .applying(NSImage.SymbolConfiguration(paletteColors: [.black]))
+                guard let source = NSImage(systemSymbolName: symbol ?? "ellipsis", accessibilityDescription: nil)?
+                    .withSymbolConfiguration(configuration) else { return false }
+                let raster = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 44, pixelsHigh: 44,
+                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                    colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+                raster.size = canvas
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: raster)
+                source.draw(in: NSRect(x: (22 - source.size.width) / 2, y: (22 - source.size.height) / 2,
+                                       width: source.size.width, height: source.size.height))
+                NSGraphicsContext.current?.compositingOperation = .sourceIn
+                color.setFill()
+                NSBezierPath(rect: NSRect(origin: .zero, size: canvas)).fill()
+                NSGraphicsContext.restoreGraphicsState()
+                raster.draw(in: rect)
             }
+            return true
         }
-        let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: .medium)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
-        let image = NSImage(systemSymbolName: symbol ?? "ellipsis", accessibilityDescription: nil)!
-            .withSymbolConfiguration(configuration)!
         image.isTemplate = false
         return image
     }
@@ -193,7 +212,7 @@ private struct PadFormattingMenuLabel<Content: View>: View {
 
     var body: some View {
         content()
-        .frame(width: 23, height: 28)
+        .frame(width: 26, height: 28)
         .background(Color.primary.opacity(hovered ? 0.08 : 0), in: Capsule())
         .contentShape(Capsule())
         .onHover { hovered = $0 }
@@ -205,7 +224,7 @@ struct PadFormattingButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .frame(width: 23, height: 28)
+            .frame(width: 26, height: 28)
             .background(Color.primary.opacity(hovered || configuration.isPressed ? 0.08 : 0), in: Capsule())
             .contentShape(Capsule())
             .onHover { hovered = $0 }
