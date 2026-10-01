@@ -142,7 +142,8 @@ final class PadUITests: XCTestCase {
         let cancel = app.buttons["Cancel"].firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.buttons["Save Changes"].firstMatch.isHittable)
-        let alert = app.windows.containing(.button, identifier: "Discard Changes").firstMatch
+        let alert = app.dialogs.containing(.button, identifier: "Discard Changes").firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), app.debugDescription)
         let screen = try XCTUnwrap(NSScreen.main)
         XCTAssertEqual(alert.frame.midX, screen.visibleFrame.midX, accuracy: 3)
         XCTAssertEqual(alert.frame.midY, screen.frame.maxY - screen.visibleFrame.midY, accuracy: 3)
