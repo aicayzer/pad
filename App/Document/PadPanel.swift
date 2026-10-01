@@ -382,9 +382,6 @@ private struct PadView: View {
                                                        blur: { commitRename(returnToEditor: false) })
                                         .id(renameFocusRequest)
                                         .frame(width: min(renameWidth, max(40, titleSpace - 36)))
-                                    Text(".\(files.url?.pathExtension ?? files.currentFormat.rawValue)")
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize()
                                 }
                                 .frame(height: 22)
                             } else {
