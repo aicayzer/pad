@@ -198,9 +198,9 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section {
-                Link("Source Code", destination: URL(string: "https://github.com/aicayzer/pad")!)
-                Link("Releases", destination: URL(string: "https://github.com/aicayzer/pad/releases")!)
-                Link("License", destination: URL(string: "https://github.com/aicayzer/pad/blob/main/LICENSE")!)
+                Link("Source Code", destination: URL(string: "https://github.com/aicayzer/padpad")!)
+                Link("Privacy Policy", destination: URL(string: "https://padpad.cyzr.me/privacy")!)
+                Link("License", destination: URL(string: "https://github.com/aicayzer/padpad/blob/main/LICENSE")!)
             } footer: {
                 HStack {
                     Spacer()
