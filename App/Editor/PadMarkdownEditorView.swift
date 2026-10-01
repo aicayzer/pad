@@ -15,8 +15,8 @@ struct PadMarkdownToolbar: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 4) {
                 headingMenu
-                formatButton("Bold", image: "bold", command: .bold)
-                formatButton("Italic", image: "italic", command: .italic)
+                formatButton("Bold", image: "bold", command: .bold, size: 15)
+                formatButton("Italic", image: "italic", command: .italic, size: 15)
                 linkButton
                 formatButton("Inline code", image: "chevron.left.forwardslash.chevron.right", command: .code)
                 formatButton("Code block", image: "curlybraces", command: .codeBlock, size: 13.5)
@@ -160,7 +160,7 @@ private struct PadFormattingGlyph: View {
             let dark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let color = NSColor(calibratedWhite: selected ? (dark ? 0.9 : 0.28) : 0.6, alpha: 1)
             if let text {
-                let fontSize: CGFloat = 18
+                let fontSize: CGFloat = 17
                 let base = NSFont.systemFont(ofSize: fontSize, weight: text == "H" ? .medium : .regular)
                 let font = base.fontDescriptor.withDesign(design).flatMap { NSFont(descriptor: $0, size: fontSize) } ?? base
                 let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
