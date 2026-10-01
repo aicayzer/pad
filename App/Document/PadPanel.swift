@@ -335,7 +335,6 @@ private struct PadView: View {
                                     .truncationMode(.middle)
                                     .accessibilityIdentifier("documentTitle")
                                     .help("Double-click to rename")
-                                    .frame(width: min(titleWidth(files.displayName, weight: .semibold), titleSpace), alignment: .leading)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .onTapGesture(count: 2) {
                                         editing = false
