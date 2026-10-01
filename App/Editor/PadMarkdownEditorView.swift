@@ -15,7 +15,8 @@ struct PadMarkdownToolbar: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 4) {
                 headingMenu
-                styleMenu
+                formatButton("Bold", image: "bold", command: .bold)
+                formatButton("Italic", image: "italic", command: .italic)
                 linkButton
                 formatButton("Inline code", image: "chevron.left.forwardslash.chevron.right", command: .code)
                 formatButton("Code block", image: "curlybraces", command: .codeBlock, size: 13.5)
@@ -45,17 +46,6 @@ struct PadMarkdownToolbar: View {
         .accessibilityLabel("Headings")
         .accessibilityIdentifier("headingFormatting")
         .accessibilityValue(active(.heading) ? "On" : "Off")
-    }
-
-    private var styleMenu: some View {
-        Menu { styleCommands } label: {
-            PadFormattingGlyph(text: "I", design: .serif, selected: active(.bold) || active(.italic))
-        }
-        .modifier(PadFormattingControlFrame())
-        .tint(active(.bold) || active(.italic) ? .primary : .secondary)
-        .help("Text style")
-        .accessibilityLabel("Text style")
-        .accessibilityValue(active(.bold) || active(.italic) ? "On" : "Off")
     }
 
     private var listMenu: some View {
