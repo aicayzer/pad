@@ -26,9 +26,14 @@ final class PadPanel: NSPanel {
     private let files: PadDocument
     private let quit: @MainActor () -> Void
     private var previousFrame: NSRect?
+    private static let maximumWidth: CGFloat = 1_200
+    private static let centerSnapDistance: CGFloat = 20
+    private var trackingWindowMove = false
+    private var pendingCenterSnap: DispatchWorkItem?
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
+    private lazy var errorBanner = PadErrorBanner(owner: self)
 
     var pendingEditorEventCount: Int { pendingEditorInput.eventCount }
 
@@ -58,14 +63,72 @@ final class PadPanel: NSPanel {
             guard let self else { return }
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
+        }, presentError: { [weak self] message in
+            self?.errorBanner.show(message)
         }).environment(files.appSettings ?? AppSettings())
             // Hosting derives the native minimum from the content's constraints.
-            .frame(minWidth: 520, minHeight: 320))
+            .frame(minWidth: 520, maxWidth: Self.maximumWidth, minHeight: 320))
+        maxSize = NSSize(width: Self.maximumWidth, height: CGFloat.greatestFiniteMagnitude)
         pendingEditorInput.attach(to: self)
         pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
                                                name: NSApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowWillMove),
+                                               name: NSWindow.willMoveNotification, object: self)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowMoved),
+                                               name: NSWindow.didMoveNotification, object: self)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowResized),
+                                               name: NSWindow.didResizeNotification, object: self)
         center()
+    }
+
+    @objc private func windowResized() { errorBanner.show(files.error) }
+
+    override func orderOut(_ sender: Any?) {
+        errorBanner.hide()
+        super.orderOut(sender)
+    }
+
+    @objc private func windowWillMove() {
+        trackingWindowMove = NSEvent.pressedMouseButtons & 1 != 0
+    }
+
+    @objc private func windowMoved() {
+        errorBanner.position()
+        guard trackingWindowMove else { return }
+        scheduleCenterSnap()
+    }
+
+    private func scheduleCenterSnap() {
+        pendingCenterSnap?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            // Native dragging runs its own event loop. Wait until the mouse is
+            // released, so a pause during a drag never pulls the window away.
+            if NSEvent.pressedMouseButtons & 1 != 0 {
+                self.scheduleCenterSnap()
+                return
+            }
+            self.pendingCenterSnap = nil
+            self.trackingWindowMove = false
+            self.snapNearCenter()
+        }
+        pendingCenterSnap = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    private func snapNearCenter() {
+        guard isVisible, let screen else { return }
+        let visible = screen.visibleFrame
+        var target = frame
+        if abs(frame.midX - visible.midX) <= Self.centerSnapDistance {
+            target.origin.x = visible.midX - frame.width / 2
+        }
+        if abs(frame.midY - visible.midY) <= Self.centerSnapDistance {
+            target.origin.y = visible.midY - frame.height / 2
+        }
+        guard target.origin != frame.origin else { return }
+        setFrameOrigin(target.origin)
     }
 
     @objc private func applicationBecameActive() { requestEditorFocus() }
@@ -191,6 +254,7 @@ final class PadPanel: NSPanel {
         if modifiers == .command {
             switch event.charactersIgnoringModifiers {
             case "w": files.close()
+            case "r": files.requestRename()
             case ",":
                 files.settingsPresented = true
                 files.showSettings()
@@ -212,12 +276,16 @@ final class PadPanel: NSPanel {
             self.previousFrame = nil
         } else if let screen = screen ?? NSScreen.main {
             previousFrame = frame
-            setFrame(screen.visibleFrame.insetBy(dx: 24, dy: 24), display: true, animate: true)
+            var expanded = screen.visibleFrame.insetBy(dx: 24, dy: 24)
+            expanded.size.width = min(expanded.width, Self.maximumWidth)
+            expanded.origin.x = screen.visibleFrame.midX - expanded.width / 2
+            setFrame(expanded, display: true, animate: true)
         }
     }
 
     override func becomeKey() {
         super.becomeKey()
+        errorBanner.show(files.error)
         files.settingsPresented = false
         guard !files.onboarding.isPresented else {
             files.isActive = false
@@ -264,8 +332,10 @@ private struct PadView: View {
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
     let prepareTitleFocus: () -> Void
+    let presentError: (String?) -> Void
     @State private var renaming = false
     @State private var titleDraft = ""
+    @State private var renameWidth: CGFloat = 100
     @State private var renamedDocument: UUID?
     @FocusState private var editing: Bool
     @State private var shareAnchor = PadShareAnchor()
@@ -287,10 +357,13 @@ private struct PadView: View {
         .onAppear {
             let action = openSettings
             files.showSettings = { action() }
+            presentError(files.error)
         }
+        .onChange(of: files.error) { _, message in presentError(message) }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             shortcut = KeyboardShortcuts.getShortcut(for: .pad)
         }
+        .onChange(of: files.renameRequest) { _, _ in beginRename() }
         .onChange(of: files.onboarding.isPresented) { _, presented in
             if presented { editing = false; renaming = false; showingFormatting = false }
         }
@@ -307,54 +380,50 @@ private struct PadView: View {
                     HStack(spacing: 6) {
                         Button { files.close() } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 15))
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 14, height: 14)
                                 .frame(width: 22, height: 26)
                         }
+                        .padding(.trailing, -2)
                         .accessibilityLabel("Close PadPad")
                         HStack(spacing: 5) {
                             if renaming {
                                 HStack(spacing: 2) {
                                     OverlaySearchField(placeholder: "Name", text: $titleDraft, fontSize: 14,
+                                                       fontWeight: .semibold, selectsTextOnFocus: true,
                                                        isCurrent: { renaming && files.isActive && renamedDocument == files.documentID },
-                                                       submit: {
-                                                           guard renamedDocument == files.documentID else { return }
-                                                           if files.rename(to: titleDraft) { finishRename() }
-                                                       }, dismiss: finishRename, blur: { renaming = false })
-                                        .frame(width: min(titleWidth(titleDraft, weight: .regular) + 6, max(40, titleSpace - 36)))
-                                    Text(".\(files.url?.pathExtension ?? files.currentFormat.rawValue)")
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize()
+                                                       submit: commitRename,
+                                                       dismiss: finishRename,
+                                                       blur: { renaming = false })
+                                        .frame(width: min(renameWidth, max(40, titleSpace - 36)))
                                 }
-                                .padding(.horizontal, 6)
-                                .frame(height: 24)
-                                .background(.background, in: RoundedRectangle(cornerRadius: 5))
+                                .frame(height: 22)
                             } else {
                                 Text(files.displayName)
                                     .font(.system(size: 14, weight: .semibold))
                                     .lineLimit(1)
                                     .truncationMode(.middle)
                                     .accessibilityIdentifier("documentTitle")
-                                    .help("Double-click to rename")
+                                    .help("Rename (⌘R or double-click)")
                                     .fixedSize(horizontal: false, vertical: true)
-                                    .onTapGesture(count: 2) {
-                                        editing = false
-                                        titleDraft = files.editableName
-                                        renamedDocument = files.documentID
-                                        prepareTitleFocus()
-                                        renaming = true
-                                    }
+                                    .onTapGesture(count: 2, perform: beginRename)
                                     .simultaneousGesture(WindowDragGesture())
                             }
 
-                            if files.isDirty {
-                                Circle().frame(width: 6, height: 6).foregroundStyle(.secondary)
+                            if files.url != nil, files.isDirty {
+                                Text("Unsaved")
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(.quaternary, in: Capsule())
+                                    .fixedSize()
                                     .accessibilityLabel("Unsaved changes")
                                     .accessibilityIdentifier("unsavedIndicator")
                             }
                         }
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
-                        .fixedSize(horizontal: true, vertical: false)
-                        DevelopmentBadge().fixedSize()
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
                             if files.currentFormat == .md, let editor = files.markdownEditor {
@@ -427,10 +496,11 @@ private struct PadView: View {
                         .padding(10)
                 }
                 HStack(alignment: .bottom, spacing: 12) {
-                    Text(files.error ?? files.notice ?? " ")
-                        .foregroundStyle(files.error == nil ? Color.secondary : Color.red)
+                    DevelopmentBadge().fixedSize()
+                    Text(files.notice ?? " ")
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityHidden(files.error == nil && files.notice == nil)
+                        .accessibilityHidden(files.notice == nil)
                     if settings.showFormatToggle {
                         Button(files.currentFormat.title) {
                             Task { await files.toggleFormat() }
@@ -475,10 +545,33 @@ private struct PadView: View {
         (text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 14, weight: weight)]).width
     }
 
+    private func beginRename() {
+        guard files.isActive, !files.isBusy, !files.onboarding.isPresented, !renaming else { return }
+        editing = false
+        titleDraft = files.editableName
+        renameWidth = max(100, titleWidth(titleDraft, weight: .semibold) + 12)
+        renamedDocument = files.documentID
+        prepareTitleFocus()
+        renaming = true
+    }
+
+    private func commitRename() {
+        guard renaming, renamedDocument == files.documentID else { return }
+        // An unsuccessful attempt keeps the original name. End the attempt
+        // and let the banner explain it without trapping the field editor.
+        _ = files.rename(to: titleDraft)
+        finishRename()
+    }
+
     private func finishRename() {
         renaming = false
         editing = files.isActive
-        if files.isActive { files.markdownEditor?.focus() }
+        // Let SwiftUI remove the native rename field before focusing WebKit.
+        // Focusing first can lose the new responder when that field unmounts.
+        DispatchQueue.main.async {
+            guard files.isActive, !renaming else { return }
+            files.markdownEditor?.focus()
+        }
     }
 
     private func actionIcon(_ symbol: String, label: String, verticalOffset: CGFloat,

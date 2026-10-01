@@ -724,7 +724,7 @@ import Testing
         files.format = .md
         files.newFile()
         #expect(files.displayName == "Untitled")
-        #expect(files.editableName.isEmpty)
+        #expect(files.editableName == "Untitled")
         #expect(files.rename(to: "Trip notes"))
         #expect(files.displayName == "Trip notes.md")
         #expect(files.editableName == "Trip notes")
@@ -833,14 +833,23 @@ import Testing
         defer { try? FileManager.default.removeItem(at: root) }
         let existing = root.appending(path: "existing.txt")
         try Data("keep".utf8).write(to: existing)
-        #expect(files.rename(to: "existing"))
         files.text = "scratch"
-        files.save()
+        #expect(!files.rename(to: "existing"))
         #expect(files.url == nil)
+        #expect(files.displayName == "Untitled")
         #expect(files.isDirty)
         #expect(files.error == PadError.nameExists.localizedDescription)
         #expect(try String(contentsOf: existing, encoding: .utf8) == "keep")
         #expect(defaults.integer(forKey: "pad.nextNumber") == 0)
+        // A unique name is accepted; a later collision is still caught by Save.
+        #expect(files.rename(to: "Unique"))
+        let unique = root.appending(path: "Unique.txt")
+        try Data("arrived later".utf8).write(to: unique)
+        files.save()
+        #expect(files.url == nil)
+        #expect(files.displayName == "Unique.txt")
+        #expect(files.error == PadError.nameExists.localizedDescription)
+        #expect(try String(contentsOf: unique, encoding: .utf8) == "arrived later")
     }
 }
 

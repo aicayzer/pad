@@ -198,6 +198,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section {
+                Link("Website", destination: URL(string: "https://padpad.cyzr.me")!)
                 Link("Source Code", destination: URL(string: "https://github.com/aicayzer/padpad")!)
                 Link("Privacy Policy", destination: URL(string: "https://padpad.cyzr.me/privacy")!)
                 Link("License", destination: URL(string: "https://github.com/aicayzer/padpad/blob/main/LICENSE")!)

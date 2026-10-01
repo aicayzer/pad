@@ -12,6 +12,9 @@ struct AppCommands: Commands {
                 .disabled(!document.isActive)
             Button("Save As…") { Task { await document.saveAs() } }.keyboardShortcut(document.editingShortcuts.shortcut(for: .saveAs)?.toSwiftUI)
                 .disabled(!document.isActive)
+            Button("Rename…") { document.requestRename() }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(!document.isActive || document.isBusy || document.onboarding.isPresented)
             Button("Share…") { document.share() }.disabled(!document.isActive)
         }
         CommandGroup(after: .pasteboard) {

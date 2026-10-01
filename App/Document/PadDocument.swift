@@ -39,12 +39,12 @@ enum PadError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupported: "Choose a .txt or .md file."
-        case .encoding: "This file is not UTF-8 text. It was not changed."
-        case .changed: "The file changed outside PadPad. Use Save As to keep both versions."
-        case .missingFolder: "The chosen folder is unavailable. Select it again in Files settings."
-        case .invalidName: "Enter a filename without slashes, colons, or control characters. The name cannot be empty, . or .., or longer than 255 bytes including its extension."
+        case .encoding: "This file uses an unsupported text encoding."
+        case .changed: "This file changed elsewhere. Use Save As to keep your changes."
+        case .missingFolder: "This folder is unavailable. Choose it again in Files settings."
+        case .invalidName: "Use a shorter name without slashes or colons."
         case .nameExists: "A file with that name already exists. Choose another name."
-        case .renamePermission: "PadPad cannot rename this file in its folder. Use Save As to choose a new name and keep the original."
+        case .renamePermission: "PadPad needs access to this folder to rename the file. Use Save As instead."
         }
     }
 }
@@ -90,6 +90,7 @@ final class PadDocument {
     var isActive = false
     var settingsPresented = false
     var showSettings: @MainActor () -> Void = {}
+    private(set) var renameRequest = 0
     var error: String?
     private(set) var notice: String? {
         didSet {
@@ -195,7 +196,7 @@ final class PadDocument {
     var isBusy: Bool { operation != nil }
     var isVisible: Bool { panel?.isVisible == true }
     var isDefaultFolder: Bool { defaults.data(forKey: Self.folderBookmarkKey) == nil }
-    var editableName: String { url?.deletingPathExtension().lastPathComponent ?? pendingName ?? "" }
+    var editableName: String { url?.deletingPathExtension().lastPathComponent ?? pendingName ?? "Untitled" }
     var displayName: String {
         url?.lastPathComponent ?? pendingName.map { "\($0).\(currentFormat.rawValue)" } ?? "Untitled"
     }
@@ -212,7 +213,7 @@ final class PadDocument {
         }
         editor.onError = { [weak self] error in
             guard let self, self.currentFormat == .md, !self.onboarding.isPresented else { return }
-            self.error = error.localizedDescription
+            self.error = readableError(error, fallback: "The editor encountered a problem. Your document is still open.")
         }
         editor.onReady = { [weak self] in
             guard let self, !self.onboarding.isPresented, self.currentFormat == .md else { return }
@@ -246,7 +247,7 @@ final class PadDocument {
             text = latest ?? editorLoadedSource
             return true
         } catch {
-            self.error = "Could not read the editor. Your document is still open. " + error.localizedDescription
+            self.error = "Couldn’t read your text. Your document is still open. Try again."
             onboarding.dismiss()
             show()
             if !isActive, !onboarding.isPresented { panel?.resumeEditor() }
@@ -288,7 +289,7 @@ final class PadDocument {
             contents.write(to: pasteboard)
             notice = "Copied"
         } catch {
-            self.error = "Could not copy the document. " + error.localizedDescription
+            self.error = "Couldn’t copy your text. Try again."
         }
     }
 
@@ -389,7 +390,7 @@ final class PadDocument {
             folder = chosen
             folderScope = chosen.startAccessingSecurityScopedResource() ? chosen : nil
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = readableError(error, fallback: "Couldn’t use this folder. Choose it again.") }
     }
 
     func useDownloads() {
@@ -543,7 +544,7 @@ final class PadDocument {
             if leavingOnboarding { panel?.resumeEditor() }
         } catch {
             if accessing { file.stopAccessingSecurityScopedResource() }
-            self.error = error.localizedDescription
+            self.error = readableError(error, fallback: "Couldn’t open this file. Try choosing it again.")
             onboarding.dismiss()
             show()
             if leavingOnboarding { panel?.resumeEditor() }
@@ -566,7 +567,7 @@ final class PadDocument {
             }
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            self.error = readableError(error, fallback: "Couldn’t read this file. Your document is still open.")
             notice = nil
         }
     }
@@ -609,7 +610,7 @@ final class PadDocument {
             }
             error = nil
             updateTitle()
-        } catch { self.error = error.localizedDescription; notice = nil }
+        } catch { self.error = readableError(error, fallback: "Couldn’t save this file. Your changes are still open."); notice = nil }
     }
 
     func toggleFormat() async {
@@ -657,7 +658,7 @@ final class PadDocument {
                 suggestion = (generated.url.lastPathComponent, generated.number)
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = readableError(error, fallback: "Couldn’t prepare the filename. Check the name and try again.")
             notice = nil
             return
         }
@@ -699,7 +700,7 @@ final class PadDocument {
             updateTitle()
         } catch {
             if accessing { destination.stopAccessingSecurityScopedResource() }
-            self.error = error.localizedDescription
+            self.error = readableError(error, fallback: "Couldn’t save this file. Your changes are still open.")
             notice = nil
         }
     }
@@ -740,7 +741,7 @@ final class PadDocument {
             error = nil
         } catch {
             operation = nil
-            self.error = error.localizedDescription
+            self.error = readableError(error, fallback: "Couldn’t share this file. Try again.")
         }
     }
 
@@ -825,11 +826,14 @@ final class PadDocument {
 
     func expand() { panel?.toggleExpanded() }
 
+    func requestRename() {
+        guard isActive, !isBusy, !onboarding.isPresented else { return }
+        renameRequest += 1
+    }
+
     @discardableResult
     func rename(to input: String) -> Bool {
         guard !isBusy else { return false }
-        operation = .transition
-        defer { operation = nil }
         do {
             let fileExtension = url?.pathExtension ?? currentFormat.rawValue
             let stem = try PadFilename.validatedStem(input)
@@ -859,6 +863,12 @@ final class PadDocument {
                     }
                 }
             } else {
+                let destination = folder.appending(path: name)
+                // Draft names refer to the configured save folder. Reject a
+                // collision now, while Save still guards against later races.
+                var attributes = stat()
+                let exists = destination.withUnsafeFileSystemRepresentation { lstat($0!, &attributes) == 0 }
+                guard !exists else { throw PadError.nameExists }
                 pendingName = stem
             }
             error = nil
@@ -866,10 +876,26 @@ final class PadDocument {
             updateTitle()
             return true
         } catch {
-            self.error = error.localizedDescription
+            self.error = readableError(error, fallback: "Couldn’t rename this file. Try another name or use Save As.")
             notice = nil
             return false
         }
+    }
+
+    private func readableError(_ error: any Error, fallback: String) -> String {
+        if let error = error as? PadError { return error.localizedDescription }
+        if let error = error as? PadMarkdownEditorError { return error.localizedDescription }
+        if let error = error as? CocoaError {
+            switch error.code {
+            case .fileReadNoSuchFile: return "This file is no longer available. Choose it again."
+            case .fileReadNoPermission, .fileWriteNoPermission:
+                return "PadPad doesn’t have access to this file. Use Open or Save As to choose it again."
+            case .fileWriteOutOfSpace: return "There isn’t enough storage to save this file. Free up some space and try again."
+            case .fileWriteFileExists: return PadError.nameExists.localizedDescription
+            default: break
+            }
+        }
+        return fallback
     }
 
     private func canRenameInContainingFolder(_ source: URL) -> Bool {

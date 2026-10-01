@@ -7,6 +7,8 @@ struct OverlaySearchField: NSViewRepresentable {
     let placeholder: String
     @Binding var text: String
     var fontSize: CGFloat = 15
+    var fontWeight: NSFont.Weight = .regular
+    var selectsTextOnFocus = false
     let isCurrent: () -> Bool
     let submit: () -> Void
     let dismiss: () -> Void
@@ -30,7 +32,8 @@ struct OverlaySearchField: NSViewRepresentable {
         context.coordinator.parent = self
         field.placeholderString = placeholder
         field.setAccessibilityLabel(placeholder)
-        field.font = .systemFont(ofSize: fontSize)
+        field.font = .systemFont(ofSize: fontSize, weight: fontWeight)
+        field.selectsTextOnFocus = selectsTextOnFocus
         field.isCurrent = isCurrent
         if field.stringValue != text { field.stringValue = text }
         field.requestInitialFocus()
@@ -83,6 +86,7 @@ struct OverlaySearchField: NSViewRepresentable {
 
 final class OverlayTextField: NSTextField {
     var isCurrent: () -> Bool = { false }
+    var selectsTextOnFocus = false
     private(set) var hasFocused = false
     private var generation = 0
     private var scheduled = false
@@ -112,6 +116,7 @@ final class OverlayTextField: NSTextField {
             let pending = window.firstResponder as? OverlayInputResponder
             self.hasFocused = window.makeFirstResponder(self)
             if self.hasFocused {
+                if self.selectsTextOnFocus { self.selectText(nil) }
                 for event in pending?.takeEvents() ?? [] {
                     guard self.isCurrent(), window.isKeyWindow else { break }
                     window.sendEvent(event)
