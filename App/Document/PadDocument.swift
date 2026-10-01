@@ -49,6 +49,10 @@ enum PadError: LocalizedError {
     }
 }
 
+enum PadUnsavedChangesDecision {
+    case save, discard, cancel
+}
+
 @MainActor
 @Observable
 final class PadDocument {
@@ -115,7 +119,6 @@ final class PadDocument {
     private(set) var markdownEditor: PadMarkdownEditorController?
     @ObservationIgnored var editorClipboard: (@MainActor () async throws -> PadClipboardContents)?
     @ObservationIgnored var editorSnapshot: (@MainActor () async throws -> String?)?
-    private var openedFromDisk = false
     private var pendingName: String?
     private var nextNumber: Int
     private enum Operation { case transition, filePanel, sharing }
@@ -127,7 +130,7 @@ final class PadDocument {
     private let copyPath: @MainActor (String) -> Void
     private let selectOpenFile: (@MainActor () async -> URL?)?
     private let selectSaveFile: (@MainActor (URL, String) async -> URL?)?
-    private let discardChanges: (@MainActor () -> Bool)?
+    private let resolveUnsavedChanges: (@MainActor () -> PadUnsavedChangesDecision)?
 
     private static let floatingKey = "pad.floating"
     private static let formatKey = "pad.format"
@@ -154,7 +157,7 @@ final class PadDocument {
          },
          selectOpenFile: (@MainActor () async -> URL?)? = nil,
          selectSaveFile: (@MainActor (URL, String) async -> URL?)? = nil,
-         discardChanges: (@MainActor () -> Bool)? = nil) {
+         resolveUnsavedChanges: (@MainActor () -> PadUnsavedChangesDecision)? = nil) {
         self.noticeDuration = noticeDuration
         self.defaults = defaults
         editingShortcuts = EditingShortcuts(defaults: defaults)
@@ -163,7 +166,7 @@ final class PadDocument {
         self.copyPath = copyPath
         self.selectOpenFile = selectOpenFile
         self.selectSaveFile = selectSaveFile
-        self.discardChanges = discardChanges
+        self.resolveUnsavedChanges = resolveUnsavedChanges
         #if DEBUG
         let defaultFloating = false
         #else
@@ -419,7 +422,7 @@ final class PadDocument {
         guard !isBusy else { return }
         if isVisible {
             close(now: now)
-        } else if openedFromDisk || isReusable(at: now) {
+        } else if url != nil || isReusable(at: now) {
             refreshCurrentFile()
             show()
         } else {
@@ -447,7 +450,7 @@ final class PadDocument {
     }
 
     private func isReusable(at now: Date) -> Bool {
-        guard !openedFromDisk, reusePeriod != .alwaysNew else { return false }
+        guard reusePeriod != .alwaysNew else { return false }
         guard let dismissedAt else { return true }
         return now.timeIntervalSince(dismissedAt) < TimeInterval(reusePeriod.rawValue * 60)
     }
@@ -464,7 +467,6 @@ final class PadDocument {
         error = nil
         notice = nil
         dismissedAt = nil
-        openedFromDisk = false
         pendingName = nil
         reloadEditor()
     }
@@ -532,7 +534,6 @@ final class PadDocument {
             savedText = content
             baseline = bytes
             dismissedAt = nil
-            openedFromDisk = true
             onboarding.dismiss()
             pendingName = nil
             error = nil
@@ -773,7 +774,7 @@ final class PadDocument {
         guard !isBusy else { return }
         operation = .transition
         defer { operation = nil }
-        guard finishCurrent(retainingScratch: true) else {
+        guard finishCurrent(retainingDocument: true) else {
             show()
             panel?.resumeEditor()
             return
@@ -791,19 +792,27 @@ final class PadDocument {
         }
     }
 
-    private func finishCurrent(retainingScratch: Bool = false) -> Bool {
+    private func finishCurrent(retainingDocument: Bool = false) -> Bool {
         guard isDirty else { return true }
         if saveAutomatically {
             saveCurrent()
             return !isDirty
         }
+        // Hiding retains both scratch and file edits. Only destructive transitions need a decision.
+        if retainingDocument { return true }
         if url != nil {
-            guard discardChanges?() ?? confirmDiscard() else { return false }
+            switch resolveUnsavedChanges?() ?? confirmUnsavedChanges() {
+            case .cancel: return false
+            case .save:
+                saveCurrent()
+                return !isDirty
+            case .discard:
+                text = savedText
+                reloadEditor()
+            }
+        } else {
+            resetDocument()
         }
-        if url == nil {
-            if !retainingScratch { resetDocument() }
-        }
-        else { text = savedText; reloadEditor() }
         return true
     }
 
@@ -921,19 +930,30 @@ final class PadDocument {
         return await picker.begin()
     }
 
-    private func confirmDiscard() -> Bool {
+    private func confirmUnsavedChanges() -> PadUnsavedChangesDecision {
         let alert = NSAlert()
-        alert.messageText = "Discard unsaved changes?"
-        alert.informativeText = "Your changes to this text file have not been saved."
-        alert.addButton(withTitle: "Keep Editing")
+        alert.messageText = "Save changes?"
+        alert.informativeText = "Save your changes to “\(displayName)” before continuing."
+        alert.addButton(withTitle: "Save Changes")
         alert.addButton(withTitle: "Discard Changes")
-        // Keep the synchronous transition guard while giving the alert an explicit owner.
-        // Child ordering keeps it above a floating Pad without changing either window's level.
+        alert.addButton(withTitle: "Cancel")
+        // Lay out before attaching: resizing an attached alert can offset it from its owner.
+        alert.layout()
         let parent = dialogParent
+        let screen = parent?.screen ?? NSScreen.main
+        if let frame = screen?.visibleFrame {
+            alert.window.setFrameOrigin(NSPoint(x: frame.midX - alert.window.frame.width / 2,
+                                                y: frame.midY - alert.window.frame.height / 2))
+        }
+        // Keep the alert above a floating Pad without raising unrelated windows.
         parent?.addChildWindow(alert.window, ordered: .above)
         defer { parent?.removeChildWindow(alert.window) }
         NSApp.activate()
-        return alert.runModal() == .alertSecondButtonReturn
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .save
+        case .alertSecondButtonReturn: return .discard
+        default: return .cancel
+        }
     }
 }
 

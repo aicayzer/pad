@@ -136,7 +136,7 @@ private struct FormatSwitchFixture {
         root = FileManager.default.temporaryDirectory.appending(path: suite)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         document = PadDocument(defaults: defaults, defaultFolder: root, presentsWindow: false,
-                               copyPath: { _ in }, selectSaveFile: selectSaveFile, discardChanges: { false })
+                               copyPath: { _ in }, selectSaveFile: selectSaveFile, resolveUnsavedChanges: { .cancel })
         document.saveAutomatically = false
     }
 

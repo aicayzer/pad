@@ -66,7 +66,7 @@ import Testing
     }
 
     @Test(arguments: [false, true])
-    func expiryNeverDeletesSavedFiles(_ automaticSaving: Bool) throws {
+    func savedFilesStayCurrentPastDraftExpiry(_ automaticSaving: Bool) throws {
         let fixture = try ScratchFixture()
         defer { fixture.cleanUp() }
         let document = fixture.document
@@ -76,8 +76,8 @@ import Testing
         document.close(now: start)
         let saved = try #require(document.url)
         document.showCurrent(now: start.addingTimeInterval(900))
-        #expect(document.text.isEmpty)
-        #expect(document.url == nil)
+        #expect(document.text == "permanent file")
+        #expect(document.url == saved)
         #expect(try String(contentsOf: saved, encoding: .utf8) == "permanent file")
     }
 
@@ -221,7 +221,7 @@ private struct ScratchFixture {
         root = FileManager.default.temporaryDirectory.appending(path: suite)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         document = PadDocument(defaults: defaults, defaultFolder: root, presentsWindow: false,
-                               copyPath: { _ in }, discardChanges: { false })
+                               copyPath: { _ in }, resolveUnsavedChanges: { .cancel })
         document.saveAutomatically = false
     }
 
