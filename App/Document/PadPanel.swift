@@ -320,6 +320,8 @@ private struct PadView: View {
     let prepareTitleFocus: () -> Void
     @State private var renaming = false
     @State private var titleDraft = ""
+    @State private var renameWidth: CGFloat = 100
+    @State private var renameFocusRequest = 0
     @State private var renamedDocument: UUID?
     @FocusState private var editing: Bool
     @State private var shareAnchor = PadShareAnchor()
@@ -367,24 +369,24 @@ private struct PadView: View {
                                 .frame(width: 14, height: 14)
                                 .frame(width: 22, height: 26)
                         }
+                        .padding(.trailing, -2)
                         .accessibilityLabel("Close PadPad")
                         HStack(spacing: 5) {
                             if renaming {
                                 HStack(spacing: 2) {
                                     OverlaySearchField(placeholder: "Name", text: $titleDraft, fontSize: 14,
+                                                       fontWeight: .semibold, selectsTextOnFocus: true,
                                                        isCurrent: { renaming && files.isActive && renamedDocument == files.documentID },
-                                                       submit: {
-                                                           guard renamedDocument == files.documentID else { return }
-                                                           if files.rename(to: titleDraft) { finishRename() }
-                                                       }, dismiss: finishRename, blur: { renaming = false })
-                                        .frame(width: min(max(100, titleWidth(titleDraft, weight: .regular) + 12), max(40, titleSpace - 36)))
+                                                       submit: { commitRename(returnToEditor: true) },
+                                                       dismiss: finishRename,
+                                                       blur: { commitRename(returnToEditor: false) })
+                                        .id(renameFocusRequest)
+                                        .frame(width: min(renameWidth, max(40, titleSpace - 36)))
                                     Text(".\(files.url?.pathExtension ?? files.currentFormat.rawValue)")
                                         .foregroundStyle(.secondary)
                                         .fixedSize()
                                 }
-                                .padding(.horizontal, 6)
-                                .frame(height: 24)
-                                .background(.background, in: RoundedRectangle(cornerRadius: 5))
+                                .frame(height: 22)
                             } else {
                                 Text(files.displayName)
                                     .font(.system(size: 14, weight: .semibold))
@@ -405,7 +407,6 @@ private struct PadView: View {
                         }
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
                         .fixedSize(horizontal: true, vertical: false)
-                        DevelopmentBadge().fixedSize()
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
                             if files.currentFormat == .md, let editor = files.markdownEditor {
@@ -478,6 +479,7 @@ private struct PadView: View {
                         .padding(10)
                 }
                 HStack(alignment: .bottom, spacing: 12) {
+                    DevelopmentBadge().fixedSize()
                     Text(files.error ?? files.notice ?? " ")
                         .foregroundStyle(files.error == nil ? Color.secondary : Color.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -530,9 +532,20 @@ private struct PadView: View {
         guard files.isActive, !files.isBusy, !files.onboarding.isPresented, !renaming else { return }
         editing = false
         titleDraft = files.editableName
+        renameWidth = max(100, titleWidth(titleDraft, weight: .semibold) + 12)
         renamedDocument = files.documentID
         prepareTitleFocus()
         renaming = true
+    }
+
+    private func commitRename(returnToEditor: Bool) {
+        guard renaming, renamedDocument == files.documentID else { return }
+        if files.rename(to: titleDraft) {
+            if returnToEditor { finishRename() } else { renaming = false }
+        } else if !returnToEditor {
+            prepareTitleFocus()
+            renameFocusRequest += 1
+        }
     }
 
     private func finishRename() {
