@@ -396,14 +396,19 @@ private struct PadView: View {
                                     .simultaneousGesture(WindowDragGesture())
                             }
 
-                            if files.isDirty {
-                                Circle().frame(width: 6, height: 6).foregroundStyle(.secondary)
+                            if files.url != nil, files.isDirty {
+                                Text("Unsaved")
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(.quaternary, in: Capsule())
+                                    .fixedSize()
                                     .accessibilityLabel("Unsaved changes")
                                     .accessibilityIdentifier("unsavedIndicator")
                             }
                         }
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
-                        .fixedSize(horizontal: true, vertical: false)
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
                             if files.currentFormat == .md, let editor = files.markdownEditor {
