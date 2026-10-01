@@ -128,19 +128,11 @@ struct PadOnboardingView: View {
             shortcutKey(compact: compact)
                 .padding(.bottom, compact ? 0 : 5)
 
-            HStack(spacing: 8) {
-                if hasPracticed {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: compact ? 19 : 22))
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                }
-                Text(hasPracticed ? "You're ready." : "One gesture away.")
-                    .font(.system(size: compact ? 26 : 29, weight: .semibold))
-                    .tracking(-0.7)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier(hasPracticed ? "onboardingDone" : "onboardingPracticeTitle")
-            }
+            Text(hasPracticed ? "Nice, it’s that simple." : "Show and hide with one shortcut.")
+                .font(.system(size: compact ? 26 : 29, weight: .semibold))
+                .tracking(-0.7)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier(hasPracticed ? "onboardingDone" : "onboardingPracticeTitle")
 
             Text(practiceExplanation)
                 .font(.system(size: compact ? 12 : 14))
@@ -158,21 +150,23 @@ struct PadOnboardingView: View {
     private var practiceExplanation: String {
         if hasPracticed { return "Try it again, or choose Done to start writing." }
         if shortcut == nil { return "No shortcut is set. Skip for now and add one in Settings." }
-        return "Use your shortcut to bring PadPad back."
+        return "Try it now. You can change your shortcut anytime in Settings."
     }
 
     private func shortcutKey(compact: Bool) -> some View {
         Text(shortcut?.description ?? "No shortcut set")
             .font(.system(size: shortcut == nil ? 15 : 25, weight: .medium))
             .tracking(shortcut == nil ? 0 : 1.5)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(onboarding.shortcutPressed ? Color.white : Color.secondary)
             .frame(minWidth: 146, minHeight: compact ? 48 : 74)
             .padding(.horizontal, 22)
-            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+            .background(onboarding.shortcutPressed ? Color.black.opacity(0.8) : Color.primary.opacity(0.035),
+                        in: RoundedRectangle(cornerRadius: 10))
             .overlay {
                 RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(.primary.opacity(0.12), lineWidth: 1)
             }
+            .animation(.easeOut(duration: 0.1), value: onboarding.shortcutPressed)
             .accessibilityLabel(shortcut.map { "Global shortcut: \($0.description)" } ?? "No global shortcut configured")
             .accessibilityValue(hasPracticed ? "Practiced \(onboarding.practiceCount) times" : "Not yet practiced")
             .accessibilityIdentifier("onboardingShortcut")
@@ -261,6 +255,7 @@ private struct OnboardingSecondaryButtonStyle: ButtonStyle {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .background(.primary.opacity(isFocused || configuration.isPressed ? 0.06 : 0), in: RoundedRectangle(cornerRadius: 6))
+            .opacity(configuration.isPressed ? 0.65 : 1)
+            .underline(isFocused, color: .secondary)
     }
 }

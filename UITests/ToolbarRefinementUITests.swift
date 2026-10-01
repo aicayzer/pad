@@ -75,7 +75,7 @@ final class ToolbarRefinementUITests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows["com_apple_SwiftUI_Settings_window"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.toolbars.buttons["General"].click()
+        settings.toolbars.buttons["Files"].click()
         let option = settings.switches["showFormatToggle"].firstMatch
         XCTAssertTrue(option.waitForExistence(timeout: 5), app.debugDescription)
         option.click()

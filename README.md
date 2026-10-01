@@ -28,7 +28,7 @@ Copy All Contents (⇧⌘C) copies the whole document without changing your sele
 
 Aa beside Share reveals formatting in the center of the top toolbar. H before Bold offers headings 1–3; selecting the active heading restores body text. Formatting starts hidden each session, and narrow windows keep additional actions in an overflow menu.
 
-Settings → General → Show format switch controls whether the MD/TXT button appears. Hiding it preserves the document’s format and contents. The button switches the current draft between formatted Markdown and plain-text source, retaining line breaks. For an existing file, it offers Save As with the new extension and keeps the original file.
+Settings → Files → Format → Show format switch controls whether the MD/TXT button appears. Hiding it preserves the document’s format and contents. The button switches the current draft between formatted Markdown and plain-text source, retaining line breaks. For an existing file, it offers Save As with the new extension and keeps the original file.
 
 ## A few shortcuts
 

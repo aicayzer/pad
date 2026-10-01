@@ -25,6 +25,7 @@ final class OnboardingUITests: XCTestCase {
         let practice = element("onboardingPractice", in: app)
         XCTAssertTrue(practice.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(element("onboardingDone", in: app).exists)
+        XCTAssertTrue(app.staticTexts["Show and hide with one shortcut."].exists)
         let finish = app.buttons["onboardingContinue"].firstMatch
         XCTAssertTrue(finish.exists)
         XCTAssertEqual(finish.label, "Done")
@@ -44,6 +45,7 @@ final class OnboardingUITests: XCTestCase {
         expectValue("Practiced 1 times", in: shortcut)
         let done = element("onboardingDone", in: app)
         XCTAssertTrue(done.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(done.label, "Nice, it’s that simple.")
         XCTAssertTrue(practice.exists, "Practicing must leave the onboarding visible")
         XCTAssertFalse(app.buttons["documentFormat"].exists, "The editor must not appear before Continue")
         attach(app.dialogs.firstMatch.screenshot(), name: "Real global shortcut acknowledged in native onboarding")
