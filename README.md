@@ -4,10 +4,12 @@
 
 [![macOS 27+](https://img.shields.io/badge/macOS-27%2B-202020?logo=apple&logoColor=white)](#install)
 [![Swift](https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
-[![CI](https://github.com/aicayzer/pad/actions/workflows/ci.yml/badge.svg)](https://github.com/aicayzer/pad/actions/workflows/ci.yml)
+[![CI](https://github.com/aicayzer/padpad/actions/workflows/ci.yml/badge.svg)](https://github.com/aicayzer/padpad/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A lightweight text and Markdown editor for macOS. Open it with a keyboard shortcut, write or edit a file, then return to your work.
+
+![PadPad editing formatted Markdown](Design/Screenshots/padpad-markdown.png)
 
 ## Install
 
