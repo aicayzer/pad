@@ -40,7 +40,8 @@ body {
   /* The viewport, not the wrapper Milkdown adds, so a click below the text still places the caret. */
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 10px 16px 24px;
+  /* Scroll the final line above the floating footer without reserving a solid row. */
+  padding: 10px 16px 48px;
   outline: none;
   white-space: pre-wrap;
   word-wrap: break-word;

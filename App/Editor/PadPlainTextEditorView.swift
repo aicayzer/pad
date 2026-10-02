@@ -26,7 +26,7 @@ struct PadPlainTextEditorView: NSViewRepresentable {
         editor.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         editor.textContainer?.widthTracksTextView = true
         editor.textContainer?.heightTracksTextView = false
-        editor.textContainerInset = NSSize(width: 0, height: 0)
+        editor.textContainerInset = NSSize(width: 0, height: 24)
         editor.string = text
         editor.delegate = context.coordinator
         scroll.documentView = editor
@@ -39,7 +39,7 @@ struct PadPlainTextEditorView: NSViewRepresentable {
         content.addTextLayoutManager(layout)
         let container = NSTextContainer()
         layout.textContainer = container
-        return NSTextView(frame: .zero, textContainer: container)
+        return PadPlainTextView(frame: .zero, textContainer: container)
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
@@ -56,6 +56,14 @@ struct PadPlainTextEditorView: NSViewRepresentable {
             guard let editor = notification.object as? NSTextView else { return }
             text.wrappedValue = editor.string
         }
+    }
+}
+
+private final class PadPlainTextView: NSTextView {
+    override var textContainerOrigin: NSPoint {
+        // Keep the existing top alignment. Both vertical insets become trailing
+        // scrollable space so the final line can clear the floating footer.
+        NSPoint(x: super.textContainerOrigin.x, y: 0)
     }
 }
 

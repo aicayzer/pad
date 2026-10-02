@@ -451,6 +451,7 @@ private struct PadView: View {
                         .fixedSize()
                         Button("Save") { files.save() }
                             .buttonStyle(PadToolbarButtonStyle(primary: true))
+                            .disabled(!files.isDirty)
                             .fixedSize()
                     }
                     .padding(.leading, 8)
@@ -474,7 +475,7 @@ private struct PadView: View {
                     .simultaneousGesture(WindowDragGesture())
             }
 
-            VStack(spacing: 0) {
+            ZStack(alignment: .bottom) {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
                         PadMarkdownEditorView(editor: editor)
@@ -493,14 +494,20 @@ private struct PadView: View {
                         .id(files.documentID)
                         .background(EditorFocusMount())
                         .focused($editing)
-                        .padding(10)
+                        .padding([.horizontal, .top], 10)
                 }
                 HStack(alignment: .bottom, spacing: 12) {
-                    DevelopmentBadge().fixedSize()
-                    Text(files.notice ?? " ")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityHidden(files.notice == nil)
+                    DevelopmentBadge()
+                        .fixedSize()
+                        .glassEffect(.regular, in: .capsule)
+                    if let notice = files.notice {
+                        Text(notice)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .glassEffect(.regular, in: .capsule)
+                    }
+                    Spacer(minLength: 0)
                     if settings.showFormatToggle {
                         Button(files.currentFormat.title) {
                             Task { await files.toggleFormat() }
@@ -588,8 +595,6 @@ private struct PadView: View {
 }
 
 private struct PadFormatButtonStyle: ButtonStyle {
-    @State private var hovered = false
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .medium))
@@ -597,14 +602,14 @@ private struct PadFormatButtonStyle: ButtonStyle {
             .frame(minWidth: 24, minHeight: 16)
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
-            .background(Color.primary.opacity(hovered || configuration.isPressed ? 0.08 : 0),
-                        in: RoundedRectangle(cornerRadius: 5))
+            .glassEffect(.regular, in: .rect(cornerRadius: 5))
+            .opacity(configuration.isPressed ? 0.7 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 5))
-            .onHover { hovered = $0 }
     }
 }
 
 private struct PadToolbarButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     var primary = false
     var selected = false
     @State private var hovered = false
@@ -612,11 +617,11 @@ private struct PadToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(primary || selected ? .primary : .secondary)
+            .foregroundStyle(isEnabled && (primary || selected) ? .primary : .secondary)
             .frame(height: 16)
             .padding(.horizontal, primary ? 14 : 8)
             .padding(.vertical, 4)
-            .background(Color.primary.opacity(primary || hovered || configuration.isPressed ? 0.1 : 0), in: Capsule())
+            .background(Color.primary.opacity(primary || (isEnabled && (hovered || configuration.isPressed)) ? 0.1 : 0), in: Capsule())
             .contentShape(Capsule())
             .onHover { hovered = $0 }
     }
