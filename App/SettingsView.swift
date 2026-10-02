@@ -19,8 +19,8 @@ struct SettingsView: View {
             Tab("Shortcuts", systemImage: "keyboard") { shortcuts }
             Tab("About", systemImage: "info.circle") { about }
         }
-        // Fits the tallest settings page while keeping tab changes still.
-        .frame(width: 460, height: 440)
+        // A shared initial size keeps tab changes still; the forms remain scrollable.
+        .frame(minWidth: 460, idealWidth: 480, minHeight: 440, idealHeight: 520)
         .tint(settings.accentColor)
         .disabled(workspace.isTransitioning)
         .background(WindowReader { window in
@@ -79,30 +79,6 @@ struct SettingsView: View {
         @Bindable var settings = settings
         @Bindable var document = document
         return Form {
-            Section {
-                Toggle("Open at login", isOn: Binding(get: { login.enabled }, set: { enabled in Task { await login.setEnabled(enabled) } }))
-                    .disabled(login.updating)
-                if login.status == .requiresApproval { Button("Allow in Login Items…") { login.openSystemSettings() } }
-                if let error = login.error { Text(error).foregroundStyle(.red) }
-                Toggle("Keep quick pad on top", isOn: $document.floating)
-                Picker("App access", selection: Binding(
-                    get: { settings.access },
-                    set: { settings.setAccess($0, hasGlobalShortcut: shortcut != nil, from: settingsWindow) }
-                )) {
-                    ForEach(AppAccess.visibleChoices) { Text($0.title).tag($0) }
-                    if settings.access == .shortcutOnly {
-                        Text(AppAccess.shortcutOnly.title).tag(AppAccess.shortcutOnly)
-                    }
-                }
-                .tint(.primary)
-                .accessibilityIdentifier("appAccess")
-            } header: { Text("App") } footer: {
-                Text("File windows appear in the Dock while they are open.")
-                if let error = settings.activationPolicyError { Text(error).foregroundStyle(.red) }
-                if !settings.showInDock && !settings.menuBarItem, let shortcut {
-                    Text("Open \(Bundle.main.displayName) with \(shortcut.description).")
-                }
-            }
             Section("Appearance") {
                 Picker("Appearance", selection: $settings.appearance) {
                     ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0) }
@@ -119,6 +95,30 @@ struct SettingsView: View {
                 MenuBarIconPicker(selection: $settings.menuBarIcon)
                     .disabled(!settings.menuBarItem)
             }
+            Section {
+                Toggle("Open at login", isOn: Binding(get: { login.enabled }, set: { enabled in Task { await login.setEnabled(enabled) } }))
+                    .disabled(login.updating)
+                if login.status == .requiresApproval { Button("Allow in Login Items…") { login.openSystemSettings() } }
+                if let error = login.error { Text(error).foregroundStyle(.red) }
+                Toggle("Keep quick pad on top", isOn: $document.floating)
+                Picker("Open PadPad from", selection: Binding(
+                    get: { settings.access },
+                    set: { settings.setAccess($0, hasGlobalShortcut: shortcut != nil, from: settingsWindow) }
+                )) {
+                    ForEach(AppAccess.visibleChoices) { Text($0.title).tag($0) }
+                    if settings.access == .shortcutOnly {
+                        Text(AppAccess.shortcutOnly.title).tag(AppAccess.shortcutOnly)
+                    }
+                }
+                .tint(.primary)
+                .accessibilityIdentifier("appAccess")
+            } header: { Text("PadPad") } footer: {
+                Text("File windows appear in the Dock while they are open.")
+                if let error = settings.activationPolicyError { Text(error).foregroundStyle(.red) }
+                if !settings.showInDock && !settings.menuBarItem, let shortcut {
+                    Text("Open \(Bundle.main.displayName) with \(shortcut.description).")
+                }
+            }
         }.formStyle(.grouped)
     }
 
@@ -127,48 +127,64 @@ struct SettingsView: View {
         return Form {
             Section {
                 windowSize("Quick pad", width: $settings.quickPadWidth, height: $settings.quickPadHeight,
-                           identifier: "quickPadDefault", actionIdentifier: "useCurrentQuickPadSize") {
-                    workspace.useCurrentQuickPadSize()
-                }
+                           identifier: "quickPadDefault", optionsIdentifier: "quickPadSizeOptions", actionIdentifier: "useCurrentQuickPadSize",
+                           useCurrent: { workspace.useCurrentQuickPadSize() },
+                           restore: { settings.restoreQuickPadSize() })
                 windowSize("File windows", width: $settings.fileWindowWidth, height: $settings.fileWindowHeight,
-                           identifier: "fileWindowDefault", actionIdentifier: "useCurrentFileSize",
-                           enabled: workspace.canUseFileSize) {
-                    workspace.useCurrentFileSize()
-                }
+                           identifier: "fileWindowDefault", optionsIdentifier: "fileWindowSizeOptions", actionIdentifier: "useCurrentFileSize",
+                           canUseCurrent: workspace.canUseFileSize,
+                           useCurrent: { workspace.useCurrentFileSize() },
+                           restore: { settings.restoreFileWindowSize() })
                 Toggle("Snap quick pad to center", isOn: $settings.snapQuickPadToCenter)
-            } header: { Text("Default Window Sizes") } footer: {
-                Text("Width × height, in points. Restore these sizes from the Window menu.")
+            } header: { Text("Window size") } footer: {
+                Text("Width × height, in points.")
             }
             Section {
                 Toggle("Limit text width", isOn: $settings.limitTextWidth)
                     .accessibilityIdentifier("limitTextWidth")
-                LabeledContent("Column width") {
-                    dimensionField(value: $settings.textColumnWidth, label: "Text column width",
-                                   identifier: "textColumnWidth")
-                    Text("pt").foregroundStyle(.secondary)
+                Picker("Column width", selection: $settings.textColumnWidthChoice) {
+                    ForEach(TextColumnWidthChoice.allCases) { Text($0.title).tag($0) }
                 }
+                .tint(.primary)
                 .disabled(!settings.limitTextWidth)
-            } header: { Text("Reading") } footer: {
+                .accessibilityIdentifier("textColumnWidthChoice")
+                if settings.textColumnWidthChoice == .custom {
+                    LabeledContent("Custom width") {
+                        dimensionField(value: $settings.textColumnWidth, label: "Text column width",
+                                       identifier: "textColumnWidth")
+                        Text("pt").foregroundStyle(.secondary)
+                    }
+                    .disabled(!settings.limitTextWidth)
+                }
+            } header: { Text("Text") } footer: {
                 Text("Keeps text centered in wider windows.")
             }
         }.formStyle(.grouped)
     }
 
     private func windowSize(_ label: String, width: Binding<Double>, height: Binding<Double>,
-                            identifier: String, actionIdentifier: String, enabled: Bool = true,
-                            action: @escaping () -> Void) -> some View {
+                            identifier: String, optionsIdentifier: String, actionIdentifier: String, canUseCurrent: Bool = true,
+                            useCurrent: @escaping () -> Void, restore: @escaping () -> Void) -> some View {
         LabeledContent(label) {
             HStack(spacing: 8) {
                 dimensionField(value: width, label: "\(label) width", identifier: identifier + "Width")
                 Text("×").foregroundStyle(.secondary)
                 dimensionField(value: height, label: "\(label) height", identifier: identifier + "Height")
-                Button("Use Current Size", action: action)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(.primary)
-                    .disabled(!enabled)
-                    .accessibilityIdentifier(actionIdentifier)
-                    .help("Use the current \(label.lowercased()) size as its default")
+                Menu {
+                    Button("Use Current Size", action: useCurrent)
+                        .disabled(!canUseCurrent)
+                        .accessibilityIdentifier(actionIdentifier)
+                    Divider()
+                    Button("Restore Default", action: restore)
+                        .accessibilityIdentifier(identifier + "Restore")
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .tint(.primary)
+                .accessibilityLabel("\(label) size options")
+                .accessibilityIdentifier(optionsIdentifier)
             }
             .fixedSize(horizontal: true, vertical: false)
         }
@@ -189,52 +205,56 @@ struct SettingsView: View {
         @Bindable var document = document
         return Form {
             Section {
-                Picker("Default draft format", selection: $document.format) {
+                Picker("Format", selection: $document.format) {
                     Text("Markdown (.md)").tag(PadFormat.md)
                     Text("Plain text (.txt)").tag(PadFormat.txt)
                 }
                 .tint(.primary)
                 Toggle("Show format switch", isOn: $settings.showFormatToggle)
                     .accessibilityIdentifier("showFormatToggle")
-            } header: { Text("Draft Format") } footer: {
-                Text("Applies to the quick pad. Opened files keep their file type.")
-            }
-            Section {
                 Toggle("Save automatically", isOn: $document.saveAutomatically)
-                Picker("Draft lifetime", selection: $document.reusePeriod) {
+                Picker("Clear draft", selection: $document.reusePeriod) {
                     ForEach(PadReuse.allCases) { period in
                         Text(period.title).tag(period)
                     }
                 }
                 .tint(.primary)
                 .accessibilityIdentifier("draftLifetime")
-            } header: { Text("Draft") } footer: {
+            } header: { Text("Quick pad") } footer: {
                 Text(draftExplanation)
             }
             Section {
-                LabeledContent("Save location") {
+                LabeledContent("Folder") {
                     Text(document.folder.lastPathComponent).foregroundStyle(.secondary).lineLimit(1).help(document.folder.path)
-                    Button("Choose…") { Task { await document.chooseFolder(parent: settingsWindow) } }
-                        .tint(.primary)
-                }
-                if !document.isDefaultFolder {
-                    Button("Use Downloads") { document.useDownloads() }
-                        .tint(.primary)
+                    Menu {
+                        Button("Choose Folder…") { Task { await document.chooseFolder(parent: settingsWindow) } }
+                        Button("Use Downloads") { document.useDownloads() }
+                            .disabled(document.isDefaultFolder)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .tint(.primary)
+                    .accessibilityLabel("Save folder options")
+                    .accessibilityIdentifier("saveFolderOptions")
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text("Filename").fixedSize()
                         Spacer(minLength: 0)
-                        Text("Example: \(document.namePreview)")
+                        Text(document.namePreview)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .help(document.namePreview)
+                            .accessibilityLabel("Filename example: \(document.namePreview)")
                     }
                     PadNameField(parts: $document.nameParts).frame(height: 26)
                 }
-            } header: { Text("Files") } footer: {
+            } header: { Text("Saving") } footer: {
+                Text("Used when saving a new quick-pad file. Opened files keep their name, folder, and format.")
                 if let error = document.error { Text(error).foregroundStyle(.red) }
             }
         }.formStyle(.grouped)
@@ -242,12 +262,12 @@ struct SettingsView: View {
 
     private var draftExplanation: String {
         if document.saveAutomatically {
-            return "Saves the quick pad when you close it or switch apps. File windows save when you choose Save."
+            return "Saves the quick pad when you close it or switch apps. Opened files save when you choose Save."
         }
         if document.reusePeriod == .alwaysNew {
-            return "Temporary quick-pad drafts clear on the next opening. Saved files and their edits are kept."
+            return "Clears temporary drafts each time you reopen the quick pad. Saved files and their edits are kept."
         }
-        return "Temporary quick-pad drafts clear after \(document.reusePeriod.title) away. Saved files and their edits are kept."
+        return "Clears temporary drafts after \(document.reusePeriod.title) away. Saved files and their edits are kept."
     }
 
     private var about: some View {
@@ -301,7 +321,7 @@ struct SettingsView: View {
 
     private var shortcuts: some View {
         Form {
-            Section("Global Shortcut") {
+            Section("Global shortcut") {
                 KeyboardShortcuts.Recorder("Show or hide \(Bundle.main.displayName)", name: .pad) { value in
                     shortcut = value
                     // Keep an entry point when the final global shortcut is removed.
