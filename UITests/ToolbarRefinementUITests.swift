@@ -10,6 +10,9 @@ final class ToolbarRefinementUITests: XCTestCase {
         defer { app.terminate() }
         let toggle = app.menuButtons["formattingMenu"].firstMatch
         expectReady(toggle)
+        let frame = app.dialogs.firstMatch.frame
+        XCTAssertEqual(frame.width, 740, accuracy: 1)
+        XCTAssertEqual(frame.height, 480, accuracy: 1)
         app.typeText("Selected words")
         let title = app.staticTexts["documentTitle"].firstMatch
         title.doubleClick()
@@ -142,6 +145,7 @@ final class ToolbarRefinementUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-pad.onboardingCompleted", "YES", "-pad.format", format,
                                "-pad.saveAutomatically", "NO", "-pad.floating", "NO",
+                               "-quickPadWidth", "740", "-quickPadHeight", "480",
                                "-showInDock", "YES", "-menuBarItem", "NO", "-showFormatToggle", "YES", "-appearance", appearance]
         app.launch()
         app.typeKey("n", modifierFlags: .command)

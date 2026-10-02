@@ -48,12 +48,16 @@ final class MarkdownUITests: XCTestCase {
         XCTAssertTrue(contents.contains("*Italic keyboard text*"), contents)
         XCTAssertTrue(contents.contains("https://example.com/padpad-ui-test"), contents)
 
+        XCTAssertFalse(app.buttons["documentFormat"].exists, "Saving locks the quick pad to its file type")
         app.typeKey("n", modifierFlags: .command)
         waitForEditor(app)
         app.typeText("New document must not leak")
         app.typeKey("o", modifierFlags: .command)
         open(saved, in: app)
-        waitForEditor(app)
+        let fileWindow = app.windows[saved.lastPathComponent].firstMatch
+        XCTAssertTrue(fileWindow.waitForExistence(timeout: 10), app.debugDescription)
+        waitForEditor(app, in: fileWindow)
+        XCTAssertFalse(fileWindow.buttons["documentFormat"].exists, "Opened files retain their file type")
         app.typeKey(.downArrow, modifierFlags: .command)
         app.typeText("\nAfter reopen")
         app.typeKey("s", modifierFlags: .command)
@@ -70,12 +74,18 @@ final class MarkdownUITests: XCTestCase {
         files.click()
         attach(settings.screenshot(), name: "Settings while formatted Markdown is open")
         settings.buttons["_XCUI:CloseWindow"].click()
-        web.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.7)).click()
+        fileWindow.webViews.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.7)).click()
         app.typeKey(.downArrow, modifierFlags: .command)
         app.typeText("\nAfter Settings")
         app.typeKey("s", modifierFlags: .command)
         waitForFile(saved, containing: "After Settings")
         attach(app.screenshot(), name: "Formatted Markdown retained after Settings")
+        app.menuBars.menuBarItems["Window"].click()
+        app.menuItems["Quick Pad"].firstMatch.click()
+        app.typeKey("c", modifierFlags: [.command, .shift])
+        waitForClipboard("New document must not leak")
+        fileWindow.click()
+        app.typeKey(.downArrow, modifierFlags: .command)
 
         let undoText = " Undoable addition"
         app.typeText(undoText)
@@ -210,11 +220,18 @@ final class MarkdownUITests: XCTestCase {
 
         for cycle in 1...2 {
             app.typeKey("n", modifierFlags: .command)
+            if cycle > 1 {
+                let discard = app.buttons["Discard Changes"].firstMatch
+                XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+                discard.click()
+            }
             waitForEditor(app)
             app.typeText("A different disposable draft")
             app.typeKey("o", modifierFlags: .command)
             open(saved, in: app)
-            waitForEditor(app)
+            let fileWindow = app.windows[saved.lastPathComponent].firstMatch
+            XCTAssertTrue(fileWindow.waitForExistence(timeout: 10), app.debugDescription)
+            waitForEditor(app, in: fileWindow)
             app.typeKey(.downArrow, modifierFlags: .command)
             app.typeText("Continued editing")
             app.typeKey("s", modifierFlags: .command)
@@ -317,7 +334,9 @@ final class MarkdownUITests: XCTestCase {
         waitForEditor(app)
         app.typeKey("o", modifierFlags: .command)
         open(saved, in: app)
-        waitForEditor(app)
+        let fileWindow = app.windows[saved.lastPathComponent].firstMatch
+        XCTAssertTrue(fileWindow.waitForExistence(timeout: 10), app.debugDescription)
+        waitForEditor(app, in: fileWindow)
         app.typeKey("c", modifierFlags: [.command, .shift])
         waitForClipboard(expected)
         attach(app.dialogs.firstMatch.screenshot(), name: "Edited Markdown reopened with separate soft-break lines")
@@ -341,9 +360,10 @@ final class MarkdownUITests: XCTestCase {
         return app
     }
 
-    private func waitForEditor(_ app: XCUIApplication) {
-        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        let toggle = app.menuButtons["formattingMenu"].firstMatch
+    private func waitForEditor(_ app: XCUIApplication, in window: XCUIElement? = nil) {
+        let surface = window ?? app.dialogs.firstMatch
+        XCTAssertTrue(surface.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        let toggle = surface.menuButtons["formattingMenu"].firstMatch
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND enabled == true"), object: toggle)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed, app.debugDescription)
     }
