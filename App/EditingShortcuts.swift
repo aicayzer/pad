@@ -51,6 +51,11 @@ final class EditingShortcuts {
 
     var isDefault: Bool { shortcuts == Self.standardShortcuts }
 
+    var restoreSizeShortcutAvailable: Bool {
+        let shortcut = KeyboardShortcuts.Shortcut(.zero, modifiers: .command)
+        return globalShortcut() != shortcut && !shortcuts.values.contains(shortcut)
+    }
+
     var copyAllShortcutAvailable: Bool {
         let shortcut = KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .shift])
         return globalShortcut() != shortcut && !shortcuts.values.contains(shortcut)

@@ -97,8 +97,8 @@ struct PadMarkdownToolbar: View {
         .accessibilityAddTraits(active(.link) ? .isSelected : [])
     }
 
-    private var overflowMenu: some View {
-        Menu {
+    var menuCommands: some View {
+        Group {
             Menu("Headings") { headingCommands }
             Menu("Text style") { styleCommands }
             Divider()
@@ -108,7 +108,11 @@ struct PadMarkdownToolbar: View {
             formatToggle("Quote", command: .quote)
             Divider()
             Menu("Lists") { listCommands }
-        } label: {
+        }
+    }
+
+    private var overflowMenu: some View {
+        Menu { menuCommands } label: {
             PadFormattingGlyph(symbol: "ellipsis")
         }
         .fixedSize()

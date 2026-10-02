@@ -1,31 +1,60 @@
 import SwiftUI
 
 struct AppCommands: Commands {
-    let document: PadDocument
+    let workspace: PadWorkspace
+    private var document: PadDocument { workspace.activeDocument }
+    private var canEdit: Bool { document.isActive && !document.isBusy && !workspace.isTransitioning && !document.onboarding.isPresented }
+
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Draft") { document.commandNew() }.keyboardShortcut(document.editingShortcuts.shortcut(for: .newFile)?.toSwiftUI)
-            Button("Open File…") { Task { await document.openPicker() } }.keyboardShortcut(document.editingShortcuts.shortcut(for: .open)?.toSwiftUI)
+            Button("New Draft") { workspace.quickPad.commandNew() }
+                .keyboardShortcut(document.editingShortcuts.shortcut(for: .newFile)?.toSwiftUI)
+                .disabled(workspace.isTransitioning)
+            Button("Open File…") { Task { await document.openPicker() } }
+                .keyboardShortcut(document.editingShortcuts.shortcut(for: .open)?.toSwiftUI)
+                .disabled(document.isBusy || workspace.isTransitioning)
         }
         CommandGroup(replacing: .saveItem) {
-            Button("Save") { document.save() }.keyboardShortcut(document.editingShortcuts.shortcut(for: .save)?.toSwiftUI)
-                .disabled(!document.isActive)
-            Button("Save As…") { Task { await document.saveAs() } }.keyboardShortcut(document.editingShortcuts.shortcut(for: .saveAs)?.toSwiftUI)
-                .disabled(!document.isActive)
+            Button("Save") { document.save() }
+                .keyboardShortcut(document.editingShortcuts.shortcut(for: .save)?.toSwiftUI)
+                .disabled(!canEdit || !document.isDirty)
+            Button("Save As…") { Task { await document.saveAs() } }
+                .keyboardShortcut(document.editingShortcuts.shortcut(for: .saveAs)?.toSwiftUI)
+                .disabled(!canEdit)
             Button("Rename…") { document.requestRename() }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(!document.isActive || document.isBusy || document.onboarding.isPresented)
-            Button("Share…") { document.share() }.disabled(!document.isActive)
+                .disabled(!canEdit)
+            Button("Share…") { document.share() }.disabled(!canEdit)
+            if document.url != nil {
+                Button("Reveal in Finder") { document.revealInFinder() }.disabled(!canEdit)
+            }
         }
         CommandGroup(after: .pasteboard) {
             Button("Copy All Contents") { Task { await document.copyAllContents() } }
                 .keyboardShortcut(document.editingShortcuts.copyAllShortcutAvailable ? KeyboardShortcut("c", modifiers: [.command, .shift]) : nil)
-                .disabled(!document.isActive || document.isBusy || document.onboarding.isPresented)
+                .disabled(!canEdit)
             Button("Copy as Markdown") { Task { await document.copyAllContents(asMarkdown: true) } }
-                .disabled(!document.isActive || document.isBusy || document.onboarding.isPresented || document.currentFormat != .md)
+                .disabled(!canEdit || document.currentFormat != .md)
+        }
+        CommandMenu("Format") {
+            if document.currentFormat == .md, let editor = document.markdownEditor {
+                PadMarkdownToolbar(editor: editor).menuCommands
+                    .disabled(!canEdit || !editor.isReady)
+            }
+        }
+        CommandGroup(after: .windowSize) {
+            Button("Restore Default Size") { document.restoreDefaultSize() }
+                .keyboardShortcut(document.editingShortcuts.restoreSizeShortcutAvailable ? KeyboardShortcut("0", modifiers: .command) : nil)
+                .disabled(!canEdit)
+            Divider()
+            Button("Quick Pad") { workspace.quickPad.showCurrent() }
+            ForEach(workspace.documents, id: \.documentID) { file in
+                Button(file.displayName) { file.showCurrent() }
+            }
         }
         CommandGroup(replacing: .help) {
-            Button("Show PadPad Introduction") { Task { await document.restartOnboarding() } }
+            Button("Show PadPad Introduction") { Task { await workspace.quickPad.restartOnboarding() } }
+                .disabled(workspace.isTransitioning)
         }
     }
 }

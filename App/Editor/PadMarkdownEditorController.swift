@@ -38,6 +38,7 @@ final class PadMarkdownEditorController: NSObject {
     @ObservationIgnored let webView: WKWebView
     @ObservationIgnored private var editorURL: URL?
     @ObservationIgnored private var pageReady = false
+    @ObservationIgnored private var readingWidth: Double?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var documentID: UUID?
     @ObservationIgnored private var pendingLoad: (markdown: String, reload: Bool)?
@@ -321,6 +322,20 @@ final class PadMarkdownEditorController: NSObject {
         String(decoding: try! JSONEncoder().encode(value), as: UTF8.self)
     }
 
+    /// Width of the complete writing column, including its existing page margins.
+    /// Applying layout never reloads the document or changes its source or selection.
+    func setReadingWidth(_ width: Double?) {
+        let sanitized = width.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        guard sanitized != readingWidth else { return }
+        readingWidth = sanitized
+        applyReadingWidth()
+    }
+
+    private func applyReadingWidth() {
+        guard pageReady else { return }
+        call("setReadingWidth", readingWidth.map { json($0) } ?? "null")
+    }
+
     private func applyAccent() {
         guard pageReady else { return }
         webView.effectiveAppearance.performAsCurrentDrawingAppearance {
@@ -337,6 +352,7 @@ final class PadMarkdownEditorController: NSObject {
         case "ready":
             pageReady = true
             applyAccent()
+            applyReadingWidth()
             call("setKeymap", json([
                 "bold": ["Mod-b"], "italic": ["Mod-i"], "code": ["Mod-e"],
                 "heading1": ["Mod-Alt-1"], "heading2": ["Mod-Alt-2"],

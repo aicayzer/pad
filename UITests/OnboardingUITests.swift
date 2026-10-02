@@ -153,7 +153,7 @@ final class OnboardingUITests: XCTestCase {
         expectValue("", in: app.textViews.firstMatch)
     }
 
-    func testResetOnboardingThenSkipPreservesTheCurrentDraft() {
+    func testIntroductionReplayThenSkipPreservesTheCurrentDraft() {
         let app = launchPad(completed: true, format: "txt")
         defer { app.terminate() }
         app.typeKey("n", modifierFlags: .command)
@@ -163,12 +163,10 @@ final class OnboardingUITests: XCTestCase {
         replaceText(draft, in: text, app: app)
         expectValue(draft, in: text)
 
-        let settings = openSettings(app)
-        selectTab("About", in: settings)
-        let reset = settings.buttons["resetOnboarding"].firstMatch
-        expectHittable(reset)
-        attach(settings.screenshot(), name: "Reset onboarding below the About information")
-        reset.click()
+        app.menuBars.menuBarItems["Help"].click()
+        let replay = app.menuItems["Show PadPad Introduction"].firstMatch
+        expectHittable(replay)
+        replay.click()
         XCTAssertTrue(element("onboardingIntro", in: app).waitForExistence(timeout: 5), app.debugDescription)
         attach(app.dialogs.firstMatch.screenshot(), name: "Onboarding replay preserves an existing draft behind it")
         let skip = app.buttons["onboardingSkip"].firstMatch
@@ -187,6 +185,29 @@ final class OnboardingUITests: XCTestCase {
         attach(app.dialogs.firstMatch.screenshot(), name: "Existing draft restored and edited after skipping replay")
     }
 
+    func testResetAppRequiresConfirmationAndCancellationPreservesWriting() {
+        let app = launchPad(completed: true, format: "txt")
+        defer { app.terminate() }
+        app.typeKey("n", modifierFlags: .command)
+        let draft = "Keep this draft when canceling Reset App."
+        let text = app.textViews.firstMatch
+        expectHittable(text)
+        replaceText(draft, in: text, app: app)
+        let settings = openSettings(app)
+        selectTab("About", in: settings)
+        settings.buttons["resetApp"].click()
+        let confirmation = settings.sheets.firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(confirmation.staticTexts["Reset PadPad?"].exists)
+        confirmation.buttons["Cancel"].click()
+        XCTAssertFalse(confirmation.exists)
+        settings.buttons[XCUIIdentifierCloseWindow].click()
+        pressGlobalShortcutFromFinder()
+        expectHittable(app.textViews.firstMatch)
+        expectValue(draft, in: app.textViews.firstMatch)
+        XCTAssertFalse(element("onboardingIntro", in: app).exists)
+    }
+
     func testCompactSettingsKeepTheSameFrameAndBottomControlsReachable() {
         let app = launchPad(completed: true, format: "txt", accent: "custom")
         defer { app.terminate() }
@@ -203,30 +224,54 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertLessThan(size.height, 580, "Settings should be shorter than the previous 580-point content area")
         attach(settings.screenshot(), name: "Compact General settings with the bottom icon control visible")
 
+        selectTab("Editor", in: settings)
+        expectHittable(settings.buttons["useCurrentQuickPadSize"].firstMatch)
+        XCTAssertTrue(settings.buttons["useCurrentFileSize"].exists)
+        XCTAssertFalse(settings.buttons["useCurrentFileSize"].isEnabled,
+                       "Use Current File Size requires an open file window")
+        let readingWidth = element("limitTextWidth", in: settings)
+        for _ in 0..<3 where !readingWidth.isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
+        }
+        expectHittable(readingWidth)
+        expectSize(size, of: settings)
+        attach(settings.screenshot(), name: "Editor settings keep sizing and text width controls reachable")
+
         selectTab("Files", in: settings)
-        expectHittable(element("File name", in: settings))
+        let filename = element("File name", in: settings)
+        for _ in 0..<3 where !filename.isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
+        }
+        expectHittable(filename)
         expectHittable(element("Insert filename variable", in: settings))
         expectSize(size, of: settings)
         attach(settings.screenshot(), name: "Compact Files settings with naming controls visible")
 
         selectTab("Shortcuts", in: settings)
-        expectHittable(settings.searchFields["editingShortcut.saveAs"].firstMatch)
+        let saveAs = settings.searchFields["editingShortcut.saveAs"].firstMatch
+        for _ in 0..<3 where !saveAs.isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
+        }
+        expectHittable(saveAs)
         // Restore Defaults is intentionally disabled for a default fixture, but must be visible.
         let restore = settings.buttons["Restore Defaults"].firstMatch
         XCTAssertTrue(restore.exists, settings.debugDescription)
+        for _ in 0..<3 where !settings.frame.contains(restore.frame) {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -100)
+        }
         XCTAssertTrue(settings.frame.contains(restore.frame), settings.debugDescription)
         expectSize(size, of: settings)
         attach(settings.screenshot(), name: "Compact Shortcuts settings with the last recorder visible")
 
         selectTab("About", in: settings)
-        let reset = settings.buttons["resetOnboarding"].firstMatch
+        let reset = settings.buttons["resetApp"].firstMatch
         expectHittable(reset)
         let license = element("License", in: settings)
         XCTAssertTrue(license.exists, settings.debugDescription)
         XCTAssertGreaterThanOrEqual(reset.frame.minY, license.frame.maxY,
-                                    "Reset onboarding belongs below the About rows")
+                                    "Reset App belongs below the About rows")
         expectSize(size, of: settings)
-        attach(settings.screenshot(), name: "Compact About settings with Reset onboarding reachable")
+        attach(settings.screenshot(), name: "Compact About settings with Reset App reachable")
 
         selectTab("General", in: settings)
         expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
@@ -287,7 +332,7 @@ final class OnboardingUITests: XCTestCase {
 
     private func waitForMarkdownEditor(_ app: XCUIApplication) {
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        expectHittable(app.buttons["formattingToggle"].firstMatch, timeout: 15)
+        expectHittable(app.menuButtons["formattingMenu"].firstMatch, timeout: 15)
         expectValue("MD", in: app.buttons["documentFormat"].firstMatch)
         XCTAssertEqual(app.buttons["documentFormat"].firstMatch.label, "Markdown")
     }

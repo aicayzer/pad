@@ -96,12 +96,17 @@ import Testing
 
     @Test(arguments: [false, true])
     func explicitNewStartsFreshAndHonorsAutomaticSaving(_ automaticSaving: Bool) throws {
-        let fixture = try ScratchFixture()
+        var confirmations = 0
+        let fixture = try ScratchFixture(resolveUnsavedChanges: {
+            confirmations += 1
+            return .discard
+        })
         defer { fixture.cleanUp() }
         let document = fixture.document
         document.saveAutomatically = automaticSaving
         document.text = "previous scratch"
         document.commandNew(now: start)
+        #expect(confirmations == (automaticSaving ? 0 : 1))
         #expect(document.text.isEmpty)
         #expect(document.url == nil)
         let saved = try fixture.savedFiles()
@@ -215,13 +220,13 @@ private struct ScratchFixture {
     private let suite: String
     private let defaults: UserDefaults
 
-    init() throws {
+    init(resolveUnsavedChanges: @escaping @MainActor () -> PadUnsavedChangesDecision = { .cancel }) throws {
         suite = "pad-scratch-tests-\(UUID().uuidString)"
         defaults = try #require(UserDefaults(suiteName: suite))
         root = FileManager.default.temporaryDirectory.appending(path: suite)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         document = PadDocument(defaults: defaults, defaultFolder: root, presentsWindow: false,
-                               copyPath: { _ in }, resolveUnsavedChanges: { .cancel })
+                               copyPath: { _ in }, resolveUnsavedChanges: resolveUnsavedChanges)
         document.saveAutomatically = false
     }
 

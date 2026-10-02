@@ -26,6 +26,7 @@ final class PadPanel: NSPanel {
     private let files: PadDocument
     private let quit: @MainActor () -> Void
     private var previousFrame: NSRect?
+    private var restoreAfterFullScreen = false
     private static let maximumWidth: CGFloat = 1_200
     private static let centerSnapDistance: CGFloat = 20
     private var trackingWindowMove = false
@@ -43,18 +44,32 @@ final class PadPanel: NSPanel {
     init(files: PadDocument, quit: @escaping @MainActor () -> Void = { NSApp.terminate(nil) }) {
         self.files = files
         self.quit = quit
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 840, height: 540),
-                   styleMask: [.titled, .resizable, .fullSizeContentView, .nonactivatingPanel],
+        let settings = files.appSettings
+        let width = files.isQuickPad ? settings?.quickPadWidth ?? 740 : settings?.fileWindowWidth ?? 800
+        let height = files.isQuickPad ? settings?.quickPadHeight ?? 480 : settings?.fileWindowHeight ?? 860
+        let mask: NSWindow.StyleMask = files.isQuickPad
+            ? [.titled, .resizable, .fullSizeContentView, .nonactivatingPanel]
+            : [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        super.init(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+                   styleMask: mask,
                    backing: .buffered, defer: false)
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
-        level = files.floating ? .floating : .normal
+        level = files.isQuickPad && files.floating ? .floating : .normal
         isOpaque = false
         backgroundColor = .clear
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
-        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-            standardWindowButton(button)?.isHidden = true
+        isFloatingPanel = false
+        becomesKeyOnlyIfNeeded = false
+        if files.isQuickPad {
+            for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                standardWindowButton(button)?.isHidden = true
+            }
+        } else {
+            collectionBehavior = [.fullScreenPrimary, .fullScreenAllowsTiling]
+            // The Window command menu lists these document controllers explicitly.
+            isExcludedFromWindowsMenu = true
         }
         // AppKit draws outside the window; a SwiftUI shadow gets clipped at the hosting bounds.
         hasShadow = true
@@ -67,8 +82,9 @@ final class PadPanel: NSPanel {
             self?.errorBanner.show(message)
         }).environment(files.appSettings ?? AppSettings())
             // Hosting derives the native minimum from the content's constraints.
-            .frame(minWidth: 520, maxWidth: Self.maximumWidth, minHeight: 320))
-        maxSize = NSSize(width: Self.maximumWidth, height: CGFloat.greatestFiniteMagnitude)
+            .frame(minWidth: 520, maxWidth: files.isQuickPad ? Self.maximumWidth : nil, minHeight: 320))
+        maxSize = NSSize(width: files.isQuickPad ? Self.maximumWidth : CGFloat.greatestFiniteMagnitude,
+                         height: CGFloat.greatestFiniteMagnitude)
         pendingEditorInput.attach(to: self)
         pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
@@ -79,7 +95,16 @@ final class PadPanel: NSPanel {
                                                name: NSWindow.didMoveNotification, object: self)
         NotificationCenter.default.addObserver(self, selector: #selector(windowResized),
                                                name: NSWindow.didResizeNotification, object: self)
-        center()
+        NotificationCenter.default.addObserver(self, selector: #selector(exitedFullScreen),
+                                               name: NSWindow.didExitFullScreenNotification, object: self)
+        restoreDefaultSize(animate: false)
+        if !files.isQuickPad, let screen = screen ?? NSScreen.main {
+            let count = max(0, (files.workspace?.documents.count ?? 1) - 1)
+            let offset = CGFloat(count % 6) * 24
+            let point = NSPoint(x: frame.minX + offset, y: frame.maxY - offset)
+            setFrameTopLeftPoint(point)
+            setFrame(constrainFrameRect(frame, to: screen), display: false)
+        }
     }
 
     @objc private func windowResized() { errorBanner.show(files.error) }
@@ -95,7 +120,7 @@ final class PadPanel: NSPanel {
 
     @objc private func windowMoved() {
         errorBanner.position()
-        guard trackingWindowMove else { return }
+        guard files.isQuickPad, files.appSettings?.snapQuickPadToCenter != false, trackingWindowMove else { return }
         scheduleCenterSnap()
     }
 
@@ -235,11 +260,12 @@ final class PadPanel: NSPanel {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard files.workspace?.isTransitioning != true else { return true }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if let action = files.editingShortcuts.action(for: event) {
             guard !files.onboarding.isPresented else { return true }
             switch action {
-            case .newFile: files.commandNew()
+            case .newFile: (files.workspace?.quickPad ?? files).commandNew()
             case .open: Task { await files.openPicker() }
             case .save: files.save()
             case .saveAs: Task { await files.saveAs() }
@@ -249,6 +275,11 @@ final class PadPanel: NSPanel {
         if files.editingShortcuts.copyAllShortcutAvailable,
            modifiers == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "c" {
             if !files.onboarding.isPresented { Task { await files.copyAllContents() } }
+            return true
+        }
+        if files.editingShortcuts.restoreSizeShortcutAvailable, modifiers == .command,
+           event.charactersIgnoringModifiers == "0" {
+            restoreDefaultSize()
             return true
         }
         if modifiers == .command {
@@ -266,11 +297,54 @@ final class PadPanel: NSPanel {
         return super.performKeyEquivalent(with: event)
     }
 
-    override func cancelOperation(_ sender: Any?) { files.close() }
+    override func cancelOperation(_ sender: Any?) {
+        if files.isQuickPad { files.close() }
+        else { super.cancelOperation(sender) }
+    }
 
     override func close() { files.close() }
 
+    func finishClosing() {
+        errorBanner.hide()
+        super.close()
+    }
+
+    func restoreDefaultSize(animate: Bool = true) {
+        let settings = files.appSettings
+        let width = files.isQuickPad ? settings?.quickPadWidth ?? 740 : settings?.fileWindowWidth ?? 800
+        let height = files.isQuickPad ? settings?.quickPadHeight ?? 480 : settings?.fileWindowHeight ?? 860
+        guard let screen = screen ?? NSScreen.main else { return }
+        if styleMask.contains(.fullScreen) {
+            restoreAfterFullScreen = true
+            toggleFullScreen(nil)
+            return
+        }
+        let visible = screen.visibleFrame.insetBy(dx: 12, dy: 12)
+        let size = NSSize(width: min(width, visible.width), height: min(height, visible.height))
+        previousFrame = nil
+        setFrame(NSRect(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2,
+                        width: size.width, height: size.height), display: true, animate: animate)
+    }
+
+    @objc private func exitedFullScreen() {
+        guard restoreAfterFullScreen else { return }
+        restoreAfterFullScreen = false
+        restoreDefaultSize()
+    }
+
+    func constrainToAvailableScreen() {
+        guard !styleMask.contains(.fullScreen), let screen = screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        var target = frame
+        target.size.width = min(target.width, visible.width)
+        target.size.height = min(target.height, visible.height)
+        target.origin.x = max(visible.minX, min(target.minX, visible.maxX - target.width))
+        target.origin.y = max(visible.minY, min(target.minY, visible.maxY - target.height))
+        if target != frame { setFrame(target, display: true) }
+    }
+
     func toggleExpanded() {
+        if !files.isQuickPad { zoom(nil); return }
         if let previousFrame {
             setFrame(previousFrame, display: true, animate: true)
             self.previousFrame = nil
@@ -285,6 +359,8 @@ final class PadPanel: NSPanel {
 
     override func becomeKey() {
         super.becomeKey()
+        files.workspace?.didFocus(files)
+        files.refreshIfNeeded()
         errorBanner.show(files.error)
         files.settingsPresented = false
         guard !files.onboarding.isPresented else {
@@ -328,6 +404,8 @@ final class PadPanel: NSPanel {
 }
 
 private struct PadView: View {
+    // Retained for a future return to inline formatting controls.
+    private static let usesCenteredFormattingToolbar = false
     @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
@@ -341,6 +419,9 @@ private struct PadView: View {
     @State private var shareAnchor = PadShareAnchor()
     @State private var showingFormatting = false
     @State private var shortcut = KeyboardShortcuts.getShortcut(for: .pad)
+
+    // The editor sits inside seven points of window padding on each side.
+    private var readingColumnWidth: Double? { settings.readingWidth.map { max(1, $0 - 14) } }
 
     var body: some View {
         ZStack {
@@ -359,6 +440,16 @@ private struct PadView: View {
             files.showSettings = { action() }
             presentError(files.error)
         }
+        .onDrop(of: ["public.file-url"], isTargeted: nil) { providers in
+            let workspace = files.workspace
+            for provider in providers {
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                    guard let url, url.isFileURL else { return }
+                    Task { @MainActor in workspace?.open(url) }
+                }
+            }
+            return !providers.isEmpty
+        }
         .onChange(of: files.error) { _, message in presentError(message) }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             shortcut = KeyboardShortcuts.getShortcut(for: .pad)
@@ -372,21 +463,26 @@ private struct PadView: View {
     private var editorContent: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
-                let centerWidth: CGFloat = showingFormatting && files.currentFormat == .md
+                let centerWidth: CGFloat = Self.usesCenteredFormattingToolbar && showingFormatting && files.currentFormat == .md
                     ? (geometry.size.width >= 820 ? 280 : geometry.size.width >= 700 ? 144 : 36) : 0
-                let sideWidth = (geometry.size.width - centerWidth) / 2 - 12
-                let titleSpace = max(40, sideWidth - 88)
+                let titleSpace = Self.usesCenteredFormattingToolbar && showingFormatting
+                    ? max(40, (geometry.size.width - centerWidth) / 2 - 100)
+                    : max(40, geometry.size.width - (files.isQuickPad ? 216 : 270))
                 ZStack {
                     HStack(spacing: 6) {
-                        Button { files.close() } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 14, height: 14)
-                                .frame(width: 22, height: 26)
+                        if files.isQuickPad {
+                            Button { files.close() } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 14, height: 14)
+                                    .frame(width: 22, height: 26)
+                            }
+                            .padding(.trailing, -2)
+                            .accessibilityLabel("Close PadPad")
+                        } else {
+                            Color.clear.frame(width: 70, height: 26)
                         }
-                        .padding(.trailing, -2)
-                        .accessibilityLabel("Close PadPad")
                         HStack(spacing: 5) {
                             if renaming {
                                 HStack(spacing: 2) {
@@ -410,38 +506,58 @@ private struct PadView: View {
                                     .onTapGesture(count: 2, perform: beginRename)
                                     .simultaneousGesture(WindowDragGesture())
                             }
-
-                            if files.url != nil, files.isDirty {
-                                Text("Unsaved")
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(.quaternary, in: Capsule())
-                                    .fixedSize()
-                                    .accessibilityLabel("Unsaved changes")
-                                    .accessibilityIdentifier("unsavedIndicator")
-                            }
                         }
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
                             if files.currentFormat == .md, let editor = files.markdownEditor {
-                                Button {
-                                    showingFormatting.toggle()
-                                    editor.focus()
-                                } label: {
-                                    Image(systemName: "textformat").frame(width: 16)
+                                Group {
+                                    if Self.usesCenteredFormattingToolbar {
+                                        Button {
+                                            showingFormatting.toggle()
+                                            editor.focus()
+                                        } label: {
+                                            Image(systemName: "textformat").frame(width: 16)
+                                        }
+                                        .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
+                                        .accessibilityLabel("Formatting")
+                                        .accessibilityIdentifier("formattingToggle")
+                                        .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
+                                        .accessibilityAddTraits(showingFormatting ? .isSelected : [])
+                                        .help(showingFormatting ? "Hide formatting" : "Show formatting")
+                                        .disabled(!editor.isReady)
+                                        .modifier(PadMarkdownLinkPresenter(editor: editor))
+                                    } else {
+                                        Menu {
+                                            PadMarkdownToolbar(editor: editor).menuCommands
+                                        } label: {
+                                            Image(systemName: "textformat").frame(width: 16)
+                                        }
+                                        .menuStyle(.button)
+                                        .menuIndicator(.hidden)
+                                        .buttonStyle(PadToolbarButtonStyle())
+                                        .accessibilityLabel("Formatting")
+                                        .accessibilityIdentifier("formattingMenu")
+                                        .help("Formatting")
+                                        .disabled(!editor.isReady)
+                                        .modifier(PadMarkdownLinkPresenter(editor: editor))
+                                    }
                                 }
-                                .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
-                                .accessibilityLabel("Formatting")
-                                .accessibilityIdentifier("formattingToggle")
-                                .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
-                                .accessibilityAddTraits(showingFormatting ? .isSelected : [])
-                                .help(showingFormatting ? "Hide formatting" : "Show formatting")
-                                .disabled(!editor.isReady)
-                                .modifier(PadMarkdownLinkPresenter(editor: editor))
                             }
+                            Menu {
+                                if files.url != nil {
+                                    Button("Reveal in Finder") { files.revealInFinder() }
+                                }
+                                Button("Restore Default Size") { files.restoreDefaultSize() }
+                            } label: {
+                                Image(systemName: "ellipsis").frame(width: 16)
+                            }
+                            .menuStyle(.button)
+                            .menuIndicator(.hidden)
+                            .buttonStyle(PadToolbarButtonStyle())
+                            .accessibilityLabel("More Options")
+                            .accessibilityIdentifier("moreOptionsMenu")
+                            .help("More Options")
                             actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
                                 files.share(from: shareAnchor.view)
                             }
@@ -451,11 +567,12 @@ private struct PadView: View {
                         .fixedSize()
                         Button("Save") { files.save() }
                             .buttonStyle(PadToolbarButtonStyle(primary: true))
+                            .disabled(!files.isDirty)
                             .fixedSize()
                     }
                     .padding(.leading, 8)
                     .padding(.trailing, 10)
-                    if showingFormatting, files.currentFormat == .md, let editor = files.markdownEditor {
+                    if Self.usesCenteredFormattingToolbar, showingFormatting, files.currentFormat == .md, let editor = files.markdownEditor {
                         PadMarkdownToolbar(editor: editor)
                             .frame(width: centerWidth)
                     }
@@ -474,10 +591,13 @@ private struct PadView: View {
                     .simultaneousGesture(WindowDragGesture())
             }
 
-            VStack(spacing: 0) {
+            ZStack(alignment: .bottom) {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
                         PadMarkdownEditorView(editor: editor)
+                            .onChange(of: settings.readingWidth, initial: true) {
+                                editor.setReadingWidth(readingColumnWidth)
+                            }
                             .onChange(of: settings.accentColor, initial: true) {
                                 editor.accentOverride = NSColor(settings.accentColor)
                             }
@@ -489,19 +609,22 @@ private struct PadView: View {
                             .onAppear { files.mountMarkdownEditor() }
                     }
                 } else {
-                    PadPlainTextEditorView(text: $files.text)
+                    PadPlainTextEditorView(text: $files.text, maxColumnWidth: readingColumnWidth.map { CGFloat($0) })
                         .id(files.documentID)
                         .background(EditorFocusMount())
                         .focused($editing)
-                        .padding(10)
+                        .padding([.horizontal, .top], 10)
                 }
                 HStack(alignment: .bottom, spacing: 12) {
-                    DevelopmentBadge().fixedSize()
-                    Text(files.notice ?? " ")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityHidden(files.notice == nil)
-                    if settings.showFormatToggle {
+                    if let notice = files.notice {
+                        Text(notice)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .glassEffect(.regular, in: .capsule)
+                    }
+                    Spacer(minLength: 0)
+                    if settings.showFormatToggle, files.isQuickPad, files.url == nil {
                         Button(files.currentFormat.title) {
                             Task { await files.toggleFormat() }
                         }
@@ -524,7 +647,7 @@ private struct PadView: View {
         .glassEffect(.regular, in: .rect)
         .ignoresSafeArea()
         .tint(settings.accentColor)
-        .disabled(files.isBusy)
+        .disabled(files.isBusy || files.workspace?.isTransitioning == true)
         .defaultFocus($editing, true)
         .onAppear {
             let action = openSettings
@@ -588,6 +711,8 @@ private struct PadView: View {
 }
 
 private struct PadFormatButtonStyle: ButtonStyle {
+    @Environment(\.isFocused) private var isFocused
+    @Environment(\.isEnabled) private var isEnabled
     @State private var hovered = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -597,14 +722,18 @@ private struct PadFormatButtonStyle: ButtonStyle {
             .frame(minWidth: 24, minHeight: 16)
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
-            .background(Color.primary.opacity(hovered || configuration.isPressed ? 0.08 : 0),
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.85),
                         in: RoundedRectangle(cornerRadius: 5))
+            .glassEffect(isEnabled && (hovered || isFocused || configuration.isPressed) ? .regular : .identity,
+                         in: .rect(cornerRadius: 5))
+            .opacity(configuration.isPressed ? 0.7 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 5))
             .onHover { hovered = $0 }
     }
 }
 
 private struct PadToolbarButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     var primary = false
     var selected = false
     @State private var hovered = false
@@ -612,11 +741,11 @@ private struct PadToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(primary || selected ? .primary : .secondary)
+            .foregroundStyle(isEnabled && (primary || selected) ? .primary : .secondary)
             .frame(height: 16)
             .padding(.horizontal, primary ? 14 : 8)
             .padding(.vertical, 4)
-            .background(Color.primary.opacity(primary || hovered || configuration.isPressed ? 0.1 : 0), in: Capsule())
+            .background(Color.primary.opacity(primary || (isEnabled && (hovered || configuration.isPressed)) ? 0.1 : 0), in: Capsule())
             .contentShape(Capsule())
             .onHover { hovered = $0 }
     }

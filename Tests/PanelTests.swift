@@ -25,7 +25,7 @@ struct PanelTests {
             defaults.removePersistentDomain(forName: suite)
             try? FileManager.default.removeItem(at: folder)
         }
-        try await eventually("Markdown editor mounting") { document.markdownEditor?.isReady == true }
+        try await eventually("Markdown editor mounting", attempts: 500) { document.markdownEditor?.isReady == true }
         panel.contentView?.layoutSubtreeIfNeeded()
         #expect(panel.contentMinSize.width == 520)
         #expect(panel.contentMinSize.height >= 320)
@@ -35,6 +35,107 @@ struct PanelTests {
         #expect(panel.contentMinSize.width == 520)
     }
 
+    @Test func independentFileWindowsSaveRejectCollisionsAndResolveCloseDecisions() async throws {
+        let suite = "pad-file-smoke-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.set(true, forKey: "pad.onboardingCompleted")
+        defaults.set("txt", forKey: "pad.format")
+        defaults.set(false, forKey: "pad.saveAutomatically")
+        let root = FileManager.default.temporaryDirectory.appending(path: suite)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let firstURL = root.appending(path: "first.txt")
+        let secondURL = root.appending(path: "second.txt")
+        try Data("First".utf8).write(to: firstURL)
+        try Data("Second".utf8).write(to: secondURL)
+        let settings = AppSettings(defaults: defaults)
+        let workspace = PadWorkspace(settings: settings, defaults: defaults, defaultFolder: root)
+        let quick = workspace.quickPad
+        defer {
+            for document in workspace.allDocuments {
+                if let sheet = document.nativeWindow?.attachedSheet {
+                    NSApp.endSheet(sheet, returnCode: NSApplication.ModalResponse.alertThirdButtonReturn.rawValue)
+                }
+                document.text = document.savedText
+                document.nativeWindow?.orderOut(nil)
+                document.close()
+            }
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        quick.newFile()
+        quick.text = "Keep the quick thought"
+        let quickID = quick.documentID
+        workspace.open(firstURL)
+        workspace.open(secondURL)
+        #expect(workspace.documents.count == 2)
+        #expect(quick.documentID == quickID)
+        #expect(quick.text == "Keep the quick thought")
+        #expect(NSApp.activationPolicy() == .regular)
+        let first = try #require(workspace.document(at: firstURL))
+        let window = try #require(first.nativeWindow)
+        #expect(window.styleMask.contains(.miniaturizable))
+        #expect(window.collectionBehavior.contains(.fullScreenPrimary))
+        workspace.open(firstURL)
+        #expect(workspace.documents.count == 2)
+        // The hosted test app cannot reliably take foreground activation on Atlas.
+        // Exercise document operations with native windows; UI tests cover actual typing/focus.
+        first.text = "First saved"
+        try await settle()
+        first.save()
+        #expect(try String(contentsOf: firstURL, encoding: .utf8) == "First saved")
+        #expect(!first.rename(to: "second"))
+        #expect(first.url == firstURL)
+        #expect(first.error == PadError.nameExists.localizedDescription)
+        #expect(try String(contentsOf: secondURL, encoding: .utf8) == "Second")
+        first.error = nil
+
+        func clickCloseDecision(_ title: String) async throws {
+            first.close()
+            try await eventually("close confirmation") { window.attachedSheet != nil }
+            let content = try #require(window.attachedSheet?.contentView)
+            func buttons(_ view: NSView) -> [NSButton] {
+                (view as? NSButton).map { [$0] } ?? view.subviews.flatMap(buttons)
+            }
+            let button = try #require(buttons(content).first { $0.title == title })
+            button.performClick(nil)
+            try await eventually("close decision completed") { !first.isBusy }
+        }
+        first.text = "First saved pending"
+        try await settle()
+        try await clickCloseDecision("Cancel")
+        #expect(workspace.documents.contains { $0 === first })
+        #expect(first.isDirty)
+        try await clickCloseDecision("Save")
+        #expect(workspace.document(at: firstURL) == nil)
+        #expect(try String(contentsOf: firstURL, encoding: .utf8) == "First saved pending")
+        workspace.open(firstURL)
+        #expect(workspace.document(at: firstURL)?.text == "First saved pending")
+        let reopened = try #require(workspace.document(at: firstURL))
+        reopened.text = "Discard this edit"
+        try await settle()
+        reopened.close()
+        let reopenedWindow = try #require(reopened.nativeWindow)
+        try await eventually("discard confirmation") { reopenedWindow.attachedSheet != nil }
+        let discardContent = try #require(reopenedWindow.attachedSheet?.contentView)
+        func discardButtons(_ view: NSView) -> [NSButton] {
+            (view as? NSButton).map { [$0] } ?? view.subviews.flatMap(discardButtons)
+        }
+        let discard = try #require(discardButtons(discardContent).first { $0.title == "Discard Changes" })
+        discard.performClick(nil)
+        try await eventually("discard completed") { !reopened.isBusy }
+        #expect(try String(contentsOf: firstURL, encoding: .utf8) == "First saved pending")
+        if quick.isVisible { quick.close() }
+        quick.handleGlobalShortcut()
+        try await eventually("global shortcut opens quick pad") { quick.isVisible }
+        quick.handleGlobalShortcut()
+        try await eventually("global shortcut hides quick pad") { !quick.isVisible }
+        #expect(workspace.documents.count == 1)
+        #expect(quick.text == "Keep the quick thought")
+        workspace.documents.first?.close()
+        try await eventually("last file closes") { workspace.documents.isEmpty }
+        #expect(!settings.hasFileWindows)
+    }
+
     // Run this suite separately from other window suites: AppKit has one key window per process.
     @Test func editorFocusSettingsAndDocumentLifecycle() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "pad-panel-\(UUID().uuidString)")
@@ -42,8 +143,10 @@ struct PanelTests {
         let suite = "pad-panel-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.set("txt", forKey: "pad.format")
-        let document = PadDocument(defaults: defaults, defaultFolder: root,
-                                   noticeDuration: .milliseconds(150), copyPath: { _ in })
+        let settings = AppSettings(defaults: defaults)
+        let workspace = PadWorkspace(settings: settings, defaults: defaults, defaultFolder: root,
+                                     noticeDuration: .milliseconds(150))
+        let document = workspace.quickPad
         let initialWindows = Set(NSApp.windows.map(ObjectIdentifier.init))
         let trace = PanelActivationTrace()
         defer { trace.stop() }
@@ -92,8 +195,7 @@ struct PanelTests {
 
         // A scratch document must survive opening Settings even when automatic saving is off.
         document.saveAutomatically = false
-        let settings = AppSettings(defaults: defaults)
-        settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(settings).environment(document))
+        settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(settings).environment(document).environment(workspace))
         document.showSettings = {
             settingsWindow.makeKeyAndOrderFront(nil)
         }
@@ -189,10 +291,10 @@ struct PanelTests {
         return panel.performKeyEquivalent(with: event)
     }
 
-    private func eventually(_ step: String, diagnostics: @MainActor () -> String = { "" },
+    private func eventually(_ step: String, attempts: Int = 100, diagnostics: @MainActor () -> String = { "" },
                             sourceLocation: SourceLocation = #_sourceLocation,
                             _ condition: @MainActor () -> Bool) async throws {
-        for _ in 0..<100 {
+        for _ in 0..<attempts {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(20))
         }

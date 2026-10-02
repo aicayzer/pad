@@ -56,13 +56,18 @@ enum PadUnsavedChangesDecision {
 @MainActor
 @Observable
 final class PadDocument {
+    enum Role { case quickPad, file }
+    let role: Role
+    var isQuickPad: Bool { role == .quickPad }
+    @ObservationIgnored weak var workspace: PadWorkspace?
+
     @ObservationIgnored var appSettings: AppSettings?
     let editingShortcuts: EditingShortcuts
     let onboarding: PadOnboarding
     var floating: Bool {
         didSet {
             defaults.set(floating, forKey: Self.floatingKey)
-            panel?.level = floating ? .floating : .normal
+            panel?.level = isQuickPad && floating ? .floating : .normal
         }
     }
     var format: PadFormat {
@@ -151,6 +156,7 @@ final class PadDocument {
 
     init(defaults: UserDefaults = .standard,
          defaultFolder: URL? = nil, presentsWindow: Bool = true,
+         role: Role = .quickPad, editingShortcuts: EditingShortcuts? = nil,
          noticeDuration: Duration = .seconds(2),
          copyPath: @escaping @MainActor (String) -> Void = {
              NSPasteboard.general.clearContents()
@@ -159,9 +165,10 @@ final class PadDocument {
          selectOpenFile: (@MainActor () async -> URL?)? = nil,
          selectSaveFile: (@MainActor (URL, String) async -> URL?)? = nil,
          resolveUnsavedChanges: (@MainActor () -> PadUnsavedChangesDecision)? = nil) {
+        self.role = role
         self.noticeDuration = noticeDuration
         self.defaults = defaults
-        editingShortcuts = EditingShortcuts(defaults: defaults)
+        self.editingShortcuts = editingShortcuts ?? EditingShortcuts(defaults: defaults)
         onboarding = PadOnboarding(defaults: defaults)
         self.presentsWindow = presentsWindow
         self.copyPath = copyPath
@@ -176,7 +183,7 @@ final class PadDocument {
         floating = defaults.object(forKey: Self.floatingKey) == nil ? defaultFloating : defaults.bool(forKey: Self.floatingKey)
         format = defaults.string(forKey: Self.formatKey).flatMap(PadFormat.init(rawValue:)) ?? .md
         scratchFormat = defaults.string(forKey: Self.formatKey).flatMap(PadFormat.init(rawValue:)) ?? .md
-        saveAutomatically = defaults.object(forKey: Self.autoSaveKey) == nil ? true : defaults.bool(forKey: Self.autoSaveKey)
+        saveAutomatically = role == .quickPad && (defaults.object(forKey: Self.autoSaveKey) == nil ? true : defaults.bool(forKey: Self.autoSaveKey))
         reusePeriod = PadReuse(rawValue: defaults.object(forKey: Self.reuseKey) as? Int ?? 15) ?? .fifteenMinutes
         nameParts = defaults.data(forKey: Self.namePartsKey)
             .flatMap { try? JSONDecoder().decode([PadNamePart].self, from: $0) } ?? PadFilename.defaultParts
@@ -308,7 +315,7 @@ final class PadDocument {
 
     /// Rehearsal advances only on an actual registered global-shortcut event.
     func handleGlobalShortcut() {
-        guard !isBusy else { return }
+        guard !isBusy, workspace?.isTransitioning != true else { return }
         if onboarding.isPresented {
             if onboarding.stage == .practice { onboarding.recordShortcut() }
             show()
@@ -365,7 +372,7 @@ final class PadDocument {
             show()
             return true
         }
-        guard presentsWindow, isPristineScratch, error == nil, onboarding.beginIfNeeded() else { return false }
+        guard isQuickPad, presentsWindow, isPristineScratch, error == nil, onboarding.beginIfNeeded() else { return false }
         panel?.prepareOnboarding()
         isActive = false
         show()
@@ -403,6 +410,7 @@ final class PadDocument {
     }
 
     func newFile(now: Date = .now) {
+        if !isQuickPad, let workspace { workspace.quickPad.newFile(now: now); return }
         guard !isBusy else { return }
         if onboarding.isPresented { show(); return }
         if synchronizeEditorThen({ self.newFile(now: now) }) { return }
@@ -427,6 +435,8 @@ final class PadDocument {
             refreshCurrentFile()
             show()
         } else {
+            // Expired temporary drafts deliberately clear without a save prompt.
+            resetDocument()
             newFile(now: now)
         }
     }
@@ -444,6 +454,7 @@ final class PadDocument {
     }
 
     func commandNew(now: Date = .now) {
+        if !isQuickPad, let workspace { workspace.quickPad.commandNew(now: now); return }
         guard !isBusy else { return }
         if !onboarding.isPresented, synchronizeEditorThen({ self.commandNew(now: now) }) { return }
         if presentOnboardingIfNeeded() { return }
@@ -479,7 +490,7 @@ final class PadDocument {
         guard await captureLatestEditor() else { return }
         let chosen = if let selectOpenFile { await selectOpenFile() } else { await presentOpenPanel() }
         guard let chosen else { return }
-        openDocument(chosen)
+        if let workspace { workspace.open(chosen) } else { openDocument(chosen) }
     }
 
     private func presentOpenPanel() async -> URL? {
@@ -491,6 +502,7 @@ final class PadDocument {
     }
 
     func open(_ file: URL) {
+        if let workspace { workspace.open(file); return }
         if synchronizeEditorThen({ self.open(file) }) { return }
         guard !isBusy else { return }
         operation = .transition
@@ -498,21 +510,22 @@ final class PadDocument {
         openDocument(file)
     }
 
-    private func openDocument(_ file: URL) {
+    @discardableResult
+    func openDocument(_ file: URL) -> Bool {
         let leavingOnboarding = onboarding.isPresented
         guard ["txt", "md"].contains(file.pathExtension.lowercased()) else {
             error = PadError.unsupported.localizedDescription
             onboarding.dismiss()
-            show()
+            if isQuickPad || url != nil { show() }
             if leavingOnboarding { panel?.resumeEditor() }
-            return
+            return false
         }
         if file.standardizedFileURL == url?.standardizedFileURL {
             onboarding.dismiss()
             refreshCurrentFile()
-            show()
+            if isQuickPad || url != nil { show() }
             if leavingOnboarding { panel?.resumeEditor() }
-            return
+            return true
         }
         let accessing = file.startAccessingSecurityScopedResource()
         do {
@@ -522,10 +535,10 @@ final class PadDocument {
                 if accessing { file.stopAccessingSecurityScopedResource() }
                 if leavingOnboarding {
                     onboarding.dismiss()
-                    show()
+                    if isQuickPad || url != nil { show() }
                     panel?.resumeEditor()
                 }
-                return
+                return false
             }
             documentScope?.stopAccessingSecurityScopedResource()
             documentScope = accessing ? file : nil
@@ -540,15 +553,25 @@ final class PadDocument {
             error = nil
             notice = nil
             reloadEditor()
-            show()
+            if isQuickPad || url != nil { show() }
             if leavingOnboarding { panel?.resumeEditor() }
+            return true
         } catch {
             if accessing { file.stopAccessingSecurityScopedResource() }
             self.error = readableError(error, fallback: "Couldn’t open this file. Try choosing it again.")
             onboarding.dismiss()
-            show()
+            if isQuickPad || url != nil { show() }
             if leavingOnboarding { panel?.resumeEditor() }
+            return false
         }
+    }
+
+    func refreshIfNeeded() {
+        guard url != nil, !isBusy, !onboarding.isPresented else { return }
+        // A newly mounted web editor has already received the disk contents.
+        if let editor = markdownEditor, !editor.isReady { return }
+        if synchronizeEditorThen({ self.refreshIfNeeded() }) { return }
+        refreshCurrentFile()
     }
 
     private func refreshCurrentFile() {
@@ -614,12 +637,8 @@ final class PadDocument {
     }
 
     func toggleFormat() async {
-        guard !isBusy, !onboarding.isPresented else { return }
+        guard isQuickPad, url == nil, !isBusy, !onboarding.isPresented else { return }
         let target: PadFormat = currentFormat == .md ? .txt : .md
-        if url != nil {
-            await saveAs(targetFormat: target)
-            return
-        }
         operation = .transition
         defer { operation = nil }
         guard await captureLatestEditor() else { return }
@@ -670,6 +689,8 @@ final class PadDocument {
         guard let destination, documentID == id else { return }
         let accessing = destination.startAccessingSecurityScopedResource()
         do {
+            guard PadFormat(rawValue: destination.pathExtension.lowercased()) != nil else { throw PadError.unsupported }
+            guard workspace?.document(at: destination, excluding: self) == nil else { throw PadError.nameExists }
             if let targetFormat {
                 guard destination.pathExtension.lowercased() == targetFormat.rawValue else { throw PadError.unsupported }
                 guard !FileManager.default.fileExists(atPath: destination.path) else { throw PadError.nameExists }
@@ -759,6 +780,10 @@ final class PadDocument {
     }
 
     func close(now: Date = .now) {
+        if !isQuickPad {
+            Task { await closeFileWindow() }
+            return
+        }
         guard !isBusy else { return }
         if onboarding.isPresented {
             let pristine = isPristineScratch
@@ -786,6 +811,7 @@ final class PadDocument {
     }
 
     func lostFocus() {
+        guard isQuickPad else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.onboarding.isPresented, !self.isBusy, !self.settingsPresented, self.markdownEditor?.showingLink != true,
                   self.panel?.isVisible == true, self.panel?.isKeyWindow == false else { return }
@@ -795,13 +821,13 @@ final class PadDocument {
 
     private func finishCurrent(retainingDocument: Bool = false) -> Bool {
         guard isDirty else { return true }
-        if saveAutomatically {
+        if isQuickPad && saveAutomatically {
             saveCurrent()
             return !isDirty
         }
         // Hiding retains both scratch and file edits. Only destructive transitions need a decision.
         if retainingDocument { return true }
-        if url != nil {
+        if url != nil || !text.isEmpty {
             switch resolveUnsavedChanges?() ?? confirmUnsavedChanges() {
             case .cancel: return false
             case .save:
@@ -822,6 +848,79 @@ final class PadDocument {
         operation = .transition
         defer { operation = nil }
         return finishCurrent()
+    }
+
+    var windowSize: NSSize? { panel?.frame.size }
+    var nativeWindow: NSWindow? { panel }
+
+    func restoreDefaultSize() { panel?.restoreDefaultSize() }
+    func constrainWindowToScreens() { panel?.constrainToAvailableScreen() }
+    func revealInFinder() {
+        guard let url else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    func captureForReset() async -> Bool {
+        guard !isBusy else { return false }
+        operation = .transition
+        defer { operation = nil }
+        return await captureLatestEditor()
+    }
+
+    private func closeFileWindow() async {
+        guard !isBusy else { return }
+        operation = .transition
+        let captured = await captureLatestEditor()
+        operation = nil
+        guard captured else { return }
+        operation = .transition
+        defer { operation = nil }
+        if isDirty {
+            let decision: PadUnsavedChangesDecision
+            if let resolveUnsavedChanges { decision = resolveUnsavedChanges() }
+            else { decision = await confirmFileClose() }
+            switch decision {
+            case .cancel: show(); return
+            case .save:
+                saveCurrent()
+                guard !isDirty else { show(); return }
+            case .discard:
+                text = savedText
+            }
+        }
+        isActive = false
+        markdownEditor?.allowsFocus = false
+        panel?.finishClosing()
+        panel = nil
+        documentScope?.stopAccessingSecurityScopedResource()
+        documentScope = nil
+        folderScope?.stopAccessingSecurityScopedResource()
+        folderScope = nil
+        workspace?.didClose(self)
+    }
+
+    func resetQuickPadPreferences() {
+        floating = true
+        if url == nil { format = .md }
+        scratchFormat = .md
+        defaults.set(PadFormat.md.rawValue, forKey: Self.formatKey)
+        saveAutomatically = false
+        reusePeriod = .fifteenMinutes
+        nameParts = PadFilename.defaultParts
+        // Keep an independent scope alive for an open file before forgetting its save-folder grant.
+        if documentScope == nil, url != nil, let folderScope {
+            documentScope = folderScope
+            self.folderScope = nil
+        }
+        if documentScope == nil, let url {
+            let directory = url.deletingLastPathComponent()
+            if directory.startAccessingSecurityScopedResource() { documentScope = directory }
+        }
+        useDownloads()
+        editingShortcuts.restoreDefaults()
+        onboarding.resetCompletion()
+        // Retained text cannot expire as an accidental consequence of resetting preferences.
+        dismissedAt = nil
     }
 
     func expand() { panel?.toggleExpanded() }
@@ -928,17 +1027,20 @@ final class PadDocument {
     }
 
     private func updateTitle() {
-        panel?.title = "PadPad: \(displayName)"
+        panel?.representedURL = url
+        panel?.title = isQuickPad ? "PadPad: \(displayName)" : displayName
     }
 
-    private func show() {
+    func show() {
         dismissedAt = nil
         markdownEditor?.allowsFocus = !onboarding.isPresented && currentFormat == .md
         if onboarding.isPresented { isActive = false }
         guard presentsWindow else { return }
         if panel == nil { panel = PadPanel(files: self) }
         updateTitle()
-        // PadPanel.becomeKey owns activation; focus cannot succeed before the window is key.
+        if !isQuickPad { NSApp.activate() }
+        // Focus cannot succeed before the window is key.
+        if panel?.isMiniaturized == true { panel?.deminiaturize(nil) }
         panel?.makeKeyAndOrderFront(nil)
     }
 
@@ -954,6 +1056,25 @@ final class PadDocument {
             return await picker.beginSheetModal(for: parent)
         }
         return await picker.begin()
+    }
+
+    private func confirmFileClose() async -> PadUnsavedChangesDecision {
+        guard let parent = dialogParent else { return confirmUnsavedChanges() }
+        let alert = NSAlert()
+        alert.messageText = "Save changes to “\(displayName)”?"
+        alert.informativeText = "Your changes haven’t been saved."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Discard Changes")
+        alert.addButton(withTitle: "Cancel")
+        return await withCheckedContinuation { continuation in
+            alert.beginSheetModal(for: parent) { response in
+                switch response {
+                case .alertFirstButtonReturn: continuation.resume(returning: .save)
+                case .alertSecondButtonReturn: continuation.resume(returning: .discard)
+                default: continuation.resume(returning: .cancel)
+                }
+            }
+        }
     }
 
     private func confirmUnsavedChanges() -> PadUnsavedChangesDecision {

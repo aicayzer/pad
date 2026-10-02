@@ -4,13 +4,17 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(PadDocument.self) private var document
+    @Environment(PadWorkspace.self) private var workspace
     @State private var login = LoginItemSettings()
     @State private var shortcut = KeyboardShortcuts.getShortcut(for: .pad)
     @State private var settingsWindow: NSWindow?
+    @State private var showingResetConfirmation = false
+    @State private var resetting = false
 
     var body: some View {
         TabView {
             Tab("General", systemImage: "gearshape") { general }
+            Tab("Editor", systemImage: "text.alignleft") { editor }
             Tab("Files", systemImage: "doc") { files }
             Tab("Shortcuts", systemImage: "keyboard") { shortcuts }
             Tab("About", systemImage: "info.circle") { about }
@@ -18,6 +22,7 @@ struct SettingsView: View {
         // Fits the tallest settings page while keeping tab changes still.
         .frame(width: 460, height: 420)
         .tint(settings.accentColor)
+        .disabled(workspace.isTransitioning)
         .background(WindowReader { window in
             settingsWindow = window
             window.level = document.floating ? .floating : .normal
@@ -79,7 +84,7 @@ struct SettingsView: View {
                     .disabled(login.updating)
                 if login.status == .requiresApproval { Button("Allow in Login Items…") { login.openSystemSettings() } }
                 if let error = login.error { Text(error).foregroundStyle(.red) }
-                Toggle("Always on top", isOn: $document.floating)
+                Toggle("Keep quick pad on top", isOn: $document.floating)
                 Picker("App access", selection: Binding(
                     get: { settings.access },
                     set: { settings.setAccess($0, hasGlobalShortcut: shortcut != nil, from: settingsWindow) }
@@ -92,6 +97,7 @@ struct SettingsView: View {
                 .tint(.primary)
                 .accessibilityIdentifier("appAccess")
             } header: { Text("App") } footer: {
+                Text("File windows appear in the Dock while they are open.")
                 if let error = settings.activationPolicyError { Text(error).foregroundStyle(.red) }
                 if !settings.showInDock && !settings.menuBarItem, let shortcut {
                     Text("Open \(Bundle.main.displayName) with \(shortcut.description).")
@@ -120,18 +126,74 @@ struct SettingsView: View {
         }.formStyle(.grouped)
     }
 
+    private var editor: some View {
+        @Bindable var settings = settings
+        return Form {
+            Section {
+                windowSize(width: $settings.quickPadWidth, height: $settings.quickPadHeight,
+                           identifier: "quickPadDefault")
+                Button("Use Current Size") { workspace.useCurrentQuickPadSize() }
+                    .accessibilityIdentifier("useCurrentQuickPadSize")
+                Toggle("Snap quick pad to center", isOn: $settings.snapQuickPadToCenter)
+            } header: { Text("Quick Pad") } footer: {
+                Text("Resizing the window keeps this default. Choose Window → Restore Default Size to return to it.")
+            }
+            Section {
+                windowSize(width: $settings.fileWindowWidth, height: $settings.fileWindowHeight,
+                           identifier: "fileWindowDefault")
+                Button("Use Current Size") { workspace.useCurrentFileSize() }
+                    .disabled(!workspace.canUseFileSize)
+                    .accessibilityIdentifier("useCurrentFileSize")
+            } header: { Text("File Windows") } footer: {
+                Text("New file windows use this size, adjusted to fit the screen.")
+            }
+            Section {
+                Toggle("Limit text width", isOn: $settings.limitTextWidth)
+                    .accessibilityIdentifier("limitTextWidth")
+                LabeledContent("Column width") {
+                    dimensionField(value: $settings.textColumnWidth, label: "Text column width",
+                                   identifier: "textColumnWidth")
+                    Text("pt").foregroundStyle(.secondary)
+                }
+                .disabled(!settings.limitTextWidth)
+            } header: { Text("Reading") } footer: {
+                Text("Centers the writing area in wider windows. Narrower windows fit the text to the available space.")
+            }
+        }.formStyle(.grouped)
+    }
+
+    private func windowSize(width: Binding<Double>, height: Binding<Double>, identifier: String) -> some View {
+        LabeledContent("Default size") {
+            dimensionField(value: width, label: "Width", identifier: identifier + "Width")
+            Text("×").foregroundStyle(.secondary)
+            dimensionField(value: height, label: "Height", identifier: identifier + "Height")
+            Text("pt").foregroundStyle(.secondary)
+        }
+    }
+
+    private func dimensionField(value: Binding<Double>, label: String, identifier: String) -> some View {
+        TextField(label, value: value, format: .number.precision(.fractionLength(0)))
+            .textFieldStyle(.roundedBorder)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 62)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(identifier)
+    }
+
     private var files: some View {
         @Bindable var settings = settings
         @Bindable var document = document
         return Form {
-            Section("Format") {
-                Picker("Default format", selection: $document.format) {
+            Section {
+                Picker("Default draft format", selection: $document.format) {
                     Text("Markdown (.md)").tag(PadFormat.md)
                     Text("Plain text (.txt)").tag(PadFormat.txt)
                 }
                 .tint(.primary)
                 Toggle("Show format switch", isOn: $settings.showFormatToggle)
                     .accessibilityIdentifier("showFormatToggle")
+            } header: { Text("Draft Format") } footer: {
+                Text("Applies to the quick pad. Opened files keep their file type.")
             }
             Section {
                 Toggle("Save automatically", isOn: $document.saveAutomatically)
@@ -176,12 +238,12 @@ struct SettingsView: View {
 
     private var draftExplanation: String {
         if document.saveAutomatically {
-            return "Saves to a file when you close the pad or switch apps."
+            return "Saves the quick pad when you close it or switch apps. File windows save when you choose Save."
         }
         if document.reusePeriod == .alwaysNew {
-            return "Unsaved drafts clear on the next opening."
+            return "Temporary quick-pad drafts clear on the next opening. Saved files and their edits are kept."
         }
-        return "Unsaved drafts clear after \(document.reusePeriod.title) away."
+        return "Temporary quick-pad drafts clear after \(document.reusePeriod.title) away. Saved files and their edits are kept."
     }
 
     private var about: some View {
@@ -203,21 +265,34 @@ struct SettingsView: View {
                 Link("Privacy Policy", destination: URL(string: "https://padpad.cyzr.me/privacy")!)
                 Link("License", destination: URL(string: "https://github.com/aicayzer/padpad/blob/main/LICENSE")!)
             } footer: {
+                if let error = workspace.resetError {
+                    Text(error).foregroundStyle(.secondary)
+                }
                 HStack {
                     Spacer()
-                    Button("Reset onboarding") {
-                        Task {
-                            await document.restartOnboarding()
-                            if document.onboarding.isPresented { settingsWindow?.orderOut(nil) }
-                        }
-                    }
-                    .accessibilityIdentifier("resetOnboarding")
-                    .help("Replay the introduction without changing your settings or document")
+                    Button("Reset App…") { showingResetConfirmation = true }
+                        .disabled(resetting)
+                        .accessibilityIdentifier("resetApp")
+                        .help("Restore default settings while keeping your writing and saved files")
                 }
                 .padding(.top, 8)
             }
             .tint(.primary)
         }.formStyle(.grouped)
+        .alert("Reset PadPad?", isPresented: $showingResetConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset App", role: .destructive) {
+                resetting = true
+                Task {
+                    await workspace.resetApp()
+                    shortcut = KeyboardShortcuts.getShortcut(for: .pad)
+                    login.refresh()
+                    resetting = false
+                }
+            }
+        } message: {
+            Text("Your settings will return to their defaults. Your writing and saved files will be kept.")
+        }
     }
 
     private var shortcuts: some View {
@@ -229,6 +304,10 @@ struct SettingsView: View {
                     if value == nil && !settings.showInDock && !settings.menuBarItem { settings.menuBarItem = true }
                 }
                 .shortcutValidation { document.editingShortcuts.validateGlobal($0) }
+            }
+            Section("Window") {
+                LabeledContent("Restore Default Size", value: document.editingShortcuts.restoreSizeShortcutAvailable
+                               ? "⌘0" : "Use the Window menu")
             }
             Section {
                 EditingShortcutSettings(shortcuts: document.editingShortcuts)

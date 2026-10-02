@@ -6,6 +6,77 @@ import SwiftUI
 @Observable
 final class AppSettings {
     private let defaults: UserDefaults
+    private var quickPadWidthValue: Double
+    var quickPadWidth: Double {
+        get { quickPadWidthValue }
+        set {
+            quickPadWidthValue = Self.dimension(newValue, fallback: 740, range: 520...1200)
+            defaults.set(quickPadWidthValue, forKey: "quickPadWidth")
+        }
+    }
+    private var quickPadHeightValue: Double
+    var quickPadHeight: Double {
+        get { quickPadHeightValue }
+        set {
+            quickPadHeightValue = Self.dimension(newValue, fallback: 480, range: 320...2400)
+            defaults.set(quickPadHeightValue, forKey: "quickPadHeight")
+        }
+    }
+    private var fileWindowWidthValue: Double
+    var fileWindowWidth: Double {
+        get { fileWindowWidthValue }
+        set {
+            fileWindowWidthValue = Self.dimension(newValue, fallback: 800, range: 520...3000)
+            defaults.set(fileWindowWidthValue, forKey: "fileWindowWidth")
+        }
+    }
+    private var fileWindowHeightValue: Double
+    var fileWindowHeight: Double {
+        get { fileWindowHeightValue }
+        set {
+            fileWindowHeightValue = Self.dimension(newValue, fallback: 860, range: 320...2400)
+            defaults.set(fileWindowHeightValue, forKey: "fileWindowHeight")
+        }
+    }
+    private var textColumnWidthValue: Double
+    var textColumnWidth: Double {
+        get { textColumnWidthValue }
+        set {
+            textColumnWidthValue = Self.dimension(newValue, fallback: 740, range: 320...3000)
+            defaults.set(textColumnWidthValue, forKey: "textColumnWidth")
+        }
+    }
+    var limitTextWidth: Bool { didSet { defaults.set(limitTextWidth, forKey: "limitTextWidth") } }
+    var snapQuickPadToCenter: Bool { didSet { defaults.set(snapQuickPadToCenter, forKey: "snapQuickPadToCenter") } }
+    var hasFileWindows = false {
+        didSet { if hasFileWindows != oldValue { applyActivationPolicy() } }
+    }
+    var readingWidth: Double? { limitTextWidth ? textColumnWidth : nil }
+
+    private static func dimension(_ value: Double, fallback: Double, range: ClosedRange<Double>) -> Double {
+        value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
+    }
+
+    func restoreEditorDefaults() {
+        quickPadWidth = 740
+        quickPadHeight = 480
+        fileWindowWidth = 800
+        fileWindowHeight = 860
+        textColumnWidth = 740
+        limitTextWidth = true
+        snapQuickPadToCenter = true
+    }
+
+    func resetPreferences(from window: NSWindow?) {
+        restoreEditorDefaults()
+        appearance = .system
+        accent = .standard
+        customAccent = "BEBAFC"
+        menuBarIcon = .mark
+        showFormatToggle = true
+        setAccess(.both, hasGlobalShortcut: true, from: window)
+    }
+
     var showInDock: Bool { didSet { defaults.set(showInDock, forKey: "showInDock"); if !defersActivationPolicy { applyActivationPolicy() } } }
     var menuBarItem: Bool { didSet { defaults.set(menuBarItem, forKey: "menuBarItem") } }
     var menuBarIcon: MenuBarIcon { didSet { defaults.set(menuBarIcon.rawValue, forKey: "menuBarIcon") } }
@@ -26,6 +97,13 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        quickPadWidthValue = Self.dimension(defaults.object(forKey: "quickPadWidth") as? Double ?? 740, fallback: 740, range: 520...1200)
+        quickPadHeightValue = Self.dimension(defaults.object(forKey: "quickPadHeight") as? Double ?? 480, fallback: 480, range: 320...2400)
+        fileWindowWidthValue = Self.dimension(defaults.object(forKey: "fileWindowWidth") as? Double ?? 800, fallback: 800, range: 520...3000)
+        fileWindowHeightValue = Self.dimension(defaults.object(forKey: "fileWindowHeight") as? Double ?? 860, fallback: 860, range: 320...2400)
+        textColumnWidthValue = Self.dimension(defaults.object(forKey: "textColumnWidth") as? Double ?? 740, fallback: 740, range: 320...3000)
+        limitTextWidth = defaults.object(forKey: "limitTextWidth") == nil ? true : defaults.bool(forKey: "limitTextWidth")
+        snapQuickPadToCenter = defaults.object(forKey: "snapQuickPadToCenter") == nil ? true : defaults.bool(forKey: "snapQuickPadToCenter")
         showInDock = defaults.object(forKey: "showInDock") == nil ? true : defaults.bool(forKey: "showInDock")
         menuBarItem = defaults.object(forKey: "menuBarItem") == nil ? true : defaults.bool(forKey: "menuBarItem")
         menuBarIcon = MenuBarIcon(rawValue: defaults.string(forKey: "menuBarIcon") ?? "") ?? .mark
@@ -74,7 +152,7 @@ final class AppSettings {
 
     func applyActivationPolicy(restoring window: NSWindow? = nil) {
         guard !defersActivationPolicy else { return }
-        let policy: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
+        let policy: NSApplication.ActivationPolicy = (showInDock || hasFileWindows) ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { activationPolicyError = nil; return }
         let restoreWindow = window ?? NSApp.keyWindow
         cancelActivationTransition()

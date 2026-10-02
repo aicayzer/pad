@@ -77,6 +77,9 @@ final class PadUITests: XCTestCase {
         attach(app.screenshot(), name: "Pad editor after Settings")
 
         app.typeKey("n", modifierFlags: .command)
+        let discard = app.buttons["Discard Changes"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.click()
         expectValue("", in: editor)
         XCTAssertTrue(app.staticTexts["Untitled"].firstMatch.exists, app.debugDescription)
         app.typeText("Fresh disposable scratch")
@@ -286,6 +289,9 @@ final class PadUITests: XCTestCase {
         app.typeKey("n", modifierFlags: .command)
         expectValue("Disposable shortcut draft", in: editor)
         app.typeKey("b", modifierFlags: [.command, .shift])
+        let discard = app.buttons["Discard Changes"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.click()
         expectValue("", in: editor)
         app.typeText("Draft after custom shortcut")
         expectValue("Draft after custom shortcut", in: editor)
@@ -300,6 +306,8 @@ final class PadUITests: XCTestCase {
         app.typeKey("b", modifierFlags: [.command, .shift])
         expectValue("Draft after custom shortcut", in: editor)
         app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        discard.click()
         expectValue("", in: editor)
         attach(app.screenshot(), name: "Restored New Draft shortcut")
     }
@@ -546,7 +554,7 @@ final class PadUITests: XCTestCase {
         selectTab("General", in: settings)
         expectValue("Menu bar", in: settings.popUpButtons["appAccess"])
         XCTAssertTrue(settings.staticTexts["Open at login"].firstMatch.exists)
-        XCTAssertTrue(settings.staticTexts["Always on top"].firstMatch.exists)
+        XCTAssertTrue(settings.staticTexts["Keep quick pad on top"].firstMatch.exists)
         checkDock("Settings open")
         selectTab("Shortcuts", in: settings)
         expectValue("⌃⌥⌘B", in: settings.searchFields.firstMatch)
