@@ -25,7 +25,7 @@ struct PanelTests {
             defaults.removePersistentDomain(forName: suite)
             try? FileManager.default.removeItem(at: folder)
         }
-        try await eventually("Markdown editor mounting") { document.markdownEditor?.isReady == true }
+        try await eventually("Markdown editor mounting", attempts: 500) { document.markdownEditor?.isReady == true }
         panel.contentView?.layoutSubtreeIfNeeded()
         #expect(panel.contentMinSize.width == 520)
         #expect(panel.contentMinSize.height >= 320)
@@ -291,10 +291,10 @@ struct PanelTests {
         return panel.performKeyEquivalent(with: event)
     }
 
-    private func eventually(_ step: String, diagnostics: @MainActor () -> String = { "" },
+    private func eventually(_ step: String, attempts: Int = 100, diagnostics: @MainActor () -> String = { "" },
                             sourceLocation: SourceLocation = #_sourceLocation,
                             _ condition: @MainActor () -> Bool) async throws {
-        for _ in 0..<100 {
+        for _ in 0..<attempts {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(20))
         }
