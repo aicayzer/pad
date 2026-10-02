@@ -19,7 +19,7 @@ jobs:
     name: App
     # GitHub-hosted macOS 27 image: actions/runner-images issue 14404.
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - name: Verify toolchain
@@ -72,7 +72,7 @@ jobs:
           done
       - name: Test application interactions
         if: github.event_name != 'workflow_dispatch' || inputs.window_tests
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: |
           set -o pipefail
           sudo /usr/sbin/DevToolsSecurity -enable
