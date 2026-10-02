@@ -328,6 +328,8 @@ final class PadPanel: NSPanel {
 }
 
 private struct PadView: View {
+    // Retained for a future return to inline formatting controls.
+    private static let usesCenteredFormattingToolbar = false
     @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
@@ -372,7 +374,7 @@ private struct PadView: View {
     private var editorContent: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
-                let centerWidth: CGFloat = showingFormatting && files.currentFormat == .md
+                let centerWidth: CGFloat = Self.usesCenteredFormattingToolbar && showingFormatting && files.currentFormat == .md
                     ? (geometry.size.width >= 820 ? 280 : geometry.size.width >= 700 ? 144 : 36) : 0
                 let sideWidth = (geometry.size.width - centerWidth) / 2 - 12
                 let titleSpace = max(40, sideWidth - 88)
@@ -410,27 +412,43 @@ private struct PadView: View {
                                     .onTapGesture(count: 2, perform: beginRename)
                                     .simultaneousGesture(WindowDragGesture())
                             }
-
-
                         }
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
                             if files.currentFormat == .md, let editor = files.markdownEditor {
-                                Button {
-                                    showingFormatting.toggle()
-                                    editor.focus()
-                                } label: {
-                                    Image(systemName: "textformat").frame(width: 16)
+                                Group {
+                                    if Self.usesCenteredFormattingToolbar {
+                                        Button {
+                                            showingFormatting.toggle()
+                                            editor.focus()
+                                        } label: {
+                                            Image(systemName: "textformat").frame(width: 16)
+                                        }
+                                        .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
+                                        .accessibilityLabel("Formatting")
+                                        .accessibilityIdentifier("formattingToggle")
+                                        .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
+                                        .accessibilityAddTraits(showingFormatting ? .isSelected : [])
+                                        .help(showingFormatting ? "Hide formatting" : "Show formatting")
+                                        .disabled(!editor.isReady)
+                                        .modifier(PadMarkdownLinkPresenter(editor: editor))
+                                    } else {
+                                        Menu {
+                                            PadMarkdownToolbar(editor: editor).menuCommands
+                                        } label: {
+                                            Image(systemName: "textformat").frame(width: 16)
+                                        }
+                                        .menuStyle(.button)
+                                        .menuIndicator(.hidden)
+                                        .buttonStyle(PadToolbarButtonStyle())
+                                        .accessibilityLabel("Formatting")
+                                        .accessibilityIdentifier("formattingMenu")
+                                        .help("Formatting")
+                                        .disabled(!editor.isReady)
+                                        .modifier(PadMarkdownLinkPresenter(editor: editor))
+                                    }
                                 }
-                                .buttonStyle(PadToolbarButtonStyle(selected: showingFormatting))
-                                .accessibilityLabel("Formatting")
-                                .accessibilityIdentifier("formattingToggle")
-                                .accessibilityValue(showingFormatting ? "Shown" : "Hidden")
-                                .accessibilityAddTraits(showingFormatting ? .isSelected : [])
-                                .help(showingFormatting ? "Hide formatting" : "Show formatting")
-                                .disabled(!editor.isReady)
-                                .modifier(PadMarkdownLinkPresenter(editor: editor))
                             }
                             actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
                                 files.share(from: shareAnchor.view)
@@ -446,7 +464,7 @@ private struct PadView: View {
                     }
                     .padding(.leading, 8)
                     .padding(.trailing, 10)
-                    if showingFormatting, files.currentFormat == .md, let editor = files.markdownEditor {
+                    if Self.usesCenteredFormattingToolbar, showingFormatting, files.currentFormat == .md, let editor = files.markdownEditor {
                         PadMarkdownToolbar(editor: editor)
                             .frame(width: centerWidth)
                     }

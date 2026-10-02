@@ -287,7 +287,7 @@ final class OnboardingUITests: XCTestCase {
 
     private func waitForMarkdownEditor(_ app: XCUIApplication) {
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        expectHittable(app.buttons["formattingToggle"].firstMatch, timeout: 15)
+        expectHittable(app.menuButtons["formattingMenu"].firstMatch, timeout: 15)
         expectValue("MD", in: app.buttons["documentFormat"].firstMatch)
         XCTAssertEqual(app.buttons["documentFormat"].firstMatch.label, "Markdown")
     }

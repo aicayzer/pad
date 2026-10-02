@@ -131,49 +131,30 @@ final class MarkdownUITests: XCTestCase {
         attach(app.screenshot(), name: "Immediate Markdown typing and saved document isolation")
     }
 
-    func testFormattingTogglePreservesSelectionAndStartsHiddenEachLaunch() throws {
+    func testFormattingMenuPreservesSelectionAndEditorLayout() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let app = launchPad()
         defer { app.terminate() }
         waitForEditor(app)
-        let toggle = app.buttons["formattingToggle"].firstMatch
-        XCTAssertEqual(toggle.value as? String, "Hidden")
-        XCTAssertFalse(app.buttons["Bold"].exists)
         app.typeText("Selected text")
         app.typeKey("a", modifierFlags: .command)
         let editorFrame = app.webViews.firstMatch.frame
-        toggle.click()
-        let bold = app.buttons["Bold"].firstMatch
+        app.menuButtons["formattingMenu"].firstMatch.click()
+        app.menuItems["Text style"].firstMatch.click()
+        let bold = app.menuItems["Bold"].firstMatch
         XCTAssertTrue(bold.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertEqual(toggle.value as? String, "Shown")
-        XCTAssertEqual(bold.frame.midY, toggle.frame.midY, accuracy: 2, "Formatting belongs in the top toolbar")
-        XCTAssertLessThan(bold.frame.maxX, toggle.frame.minX)
-        XCTAssertEqual(app.webViews.firstMatch.frame.minY, editorFrame.minY, accuracy: 1, "Showing formatting must not add an editor row")
-        XCTAssertEqual(app.webViews.firstMatch.frame.height, editorFrame.height, accuracy: 1)
-        app.webViews.firstMatch.hover()
-        attach(app.dialogs.firstMatch.screenshot(), name: "Formatting centered in the top toolbar without moving the editor")
         bold.click()
-        toggle.click()
-        XCTAssertFalse(bold.exists)
-        XCTAssertEqual(toggle.value as? String, "Hidden")
-        // No editor click: toggling chrome must preserve the selected range and keyboard focus.
+        XCTAssertEqual(app.webViews.firstMatch.frame.minY, editorFrame.minY, accuracy: 1)
+        XCTAssertEqual(app.webViews.firstMatch.frame.height, editorFrame.height, accuracy: 1)
+        // Choosing formatting must preserve the selected range and keyboard focus.
         app.typeText("Replacement")
         let saved = try saveAs(app, directory: directory)
         let replacement = try String(contentsOf: saved, encoding: .utf8)
         XCTAssertEqual(replacement.replacingOccurrences(of: "**", with: "").trimmingCharacters(in: .whitespacesAndNewlines), "Replacement")
-        attach(app.screenshot(), name: "Hidden formatting retains editing focus and selection")
-        toggle.click()
-        XCTAssertTrue(bold.waitForExistence(timeout: 5))
-        app.terminate()
-        app.launch()
-        app.typeKey("n", modifierFlags: .command)
-        waitForEditor(app)
-        XCTAssertFalse(app.buttons["Bold"].exists, "Formatting visibility is not persisted between launches")
-        XCTAssertEqual(app.buttons["formattingToggle"].firstMatch.value as? String, "Hidden")
     }
 
-    func testNarrowToolbarOverflowFormatsSelectedParagraphAndSaves() throws {
+    func testNarrowFormattingMenuFormatsSelectedParagraphAndSaves() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let app = launchPad()
@@ -181,8 +162,7 @@ final class MarkdownUITests: XCTestCase {
         waitForEditor(app)
         app.typeText("Keep plain\n\nSelected text")
         app.typeKey(.leftArrow, modifierFlags: [.command, .shift])
-        let toggle = app.buttons["formattingToggle"].firstMatch
-        toggle.click()
+        let toggle = app.menuButtons["formattingMenu"].firstMatch
 
         let window = app.dialogs.firstMatch
         let originalFrame = window.frame
@@ -197,14 +177,10 @@ final class MarkdownUITests: XCTestCase {
                            withVelocity: .slow, thenHoldForDuration: 0.2)
         XCTAssertLessThanOrEqual(window.frame.width, 540, "The window must reach its narrow layout")
 
-        let overflow = app.menuButtons["formattingOverflow"].firstMatch
-        XCTAssertTrue(overflow.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(overflow.isHittable)
-        XCTAssertEqual(overflow.frame.midY, toggle.frame.midY, accuracy: 2)
-        XCTAssertLessThan(overflow.frame.maxX, toggle.frame.minX)
+        XCTAssertTrue(toggle.isHittable)
+        XCTAssertFalse(app.menuButtons["formattingOverflow"].exists)
         XCTAssertTrue(app.buttons["Save"].firstMatch.isHittable)
-        attach(app.dialogs.firstMatch.screenshot(), name: "Narrow top toolbar keeps formatting overflow and Save available")
-        overflow.click()
+        toggle.click()
         let quote = app.menuItems["Quote"].firstMatch
         XCTAssertTrue(quote.waitForExistence(timeout: 5), app.debugDescription)
         quote.click()
@@ -367,7 +343,7 @@ final class MarkdownUITests: XCTestCase {
 
     private func waitForEditor(_ app: XCUIApplication) {
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
-        let toggle = app.buttons["formattingToggle"].firstMatch
+        let toggle = app.menuButtons["formattingMenu"].firstMatch
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND enabled == true"), object: toggle)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed, app.debugDescription)
     }

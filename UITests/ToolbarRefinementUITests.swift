@@ -3,12 +3,12 @@ import XCTest
 
 @MainActor
 final class ToolbarRefinementUITests: XCTestCase {
-    func testCompactTitleHeadingToggleAndCenteredFormatting() {
+    func testCompactTitleAndFormattingMenu() {
         let restoreClipboard = clipboardRestoration()
         defer { restoreClipboard() }
         let app = launchPad(format: "md")
         defer { app.terminate() }
-        let toggle = app.buttons["formattingToggle"].firstMatch
+        let toggle = app.menuButtons["formattingMenu"].firstMatch
         expectReady(toggle)
         app.typeText("Selected words")
         let title = app.staticTexts["documentTitle"].firstMatch
@@ -21,26 +21,19 @@ final class ToolbarRefinementUITests: XCTestCase {
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.staticTexts["Small.md"].firstMatch.waitForExistence(timeout: 5))
         app.typeKey("a", modifierFlags: .command)
-        toggle.click()
-        let heading = app.menuButtons["headingFormatting"].firstMatch
-        let bold = app.buttons["Bold"].firstMatch
-        XCTAssertTrue(heading.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertLessThan(heading.frame.maxX, bold.frame.minX)
-        let formatting = app.descendants(matching: .any)["markdownFormatting"].firstMatch
-        XCTAssertEqual(formatting.frame.midX, app.dialogs.firstMatch.frame.midX, accuracy: 2)
         for level in 1...3 {
-            heading.click()
-            let command = app.menuItems["Heading \(level)"].firstMatch
-            XCTAssertTrue(command.waitForExistence(timeout: 5), app.debugDescription)
-            XCTAssertFalse(app.menuItems["Body"].exists)
-            command.click()
-            expectValue("On", in: heading)
-            heading.click()
-            app.menuItems["Heading \(level)"].firstMatch.click()
-            expectValue("Off", in: heading)
+            for _ in 0..<2 {
+                toggle.click()
+                app.menuItems["Headings"].firstMatch.click()
+                let command = app.menuItems["Heading \(level)"].firstMatch
+                XCTAssertTrue(command.waitForExistence(timeout: 5), app.debugDescription)
+                XCTAssertFalse(app.menuItems["Body"].exists)
+                command.click()
+            }
         }
-        bold.click()
-        expectValue("On", in: bold)
+        toggle.click()
+        app.menuItems["Text style"].firstMatch.click()
+        app.menuItems["Bold"].firstMatch.click()
         // Menu actions retain the selected text and restore editing focus.
         app.typeText("Replacement")
         app.typeKey("c", modifierFlags: [.command, .shift])
@@ -89,17 +82,16 @@ final class ToolbarRefinementUITests: XCTestCase {
         attach(app.dialogs.firstMatch.screenshot(), name: "TXT native undo and accented editing")
     }
 
-    func testLongFilenameAndNarrowOverflowInLightAndDark() {
+    func testLongFilenameAndFormattingMenuAtEveryWidth() {
         for appearance in ["light", "dark"] {
             let app = launchPad(format: "md", appearance: appearance)
-            let toggle = app.buttons["formattingToggle"].firstMatch
+            let toggle = app.menuButtons["formattingMenu"].firstMatch
             expectReady(toggle)
             app.typeText("A selected paragraph")
             app.staticTexts["documentTitle"].firstMatch.doubleClick()
             app.typeText(String(repeating: "Long filename ", count: 8))
             app.typeKey(.return, modifierFlags: [])
             app.typeKey("a", modifierFlags: .command)
-            toggle.click()
             let window = app.dialogs.firstMatch
             for width in [820.0, 700.0, 520.0] {
                 let frame = window.frame
@@ -110,21 +102,20 @@ final class ToolbarRefinementUITests: XCTestCase {
                     .withOffset(CGVector(dx: width + 1, dy: frame.height / 2))
                 edge.click(forDuration: 0.2, thenDragTo: destination, withVelocity: .slow, thenHoldForDuration: 0.2)
                 XCTAssertEqual(window.frame.width, width, accuracy: 4)
-                let formatting = app.descendants(matching: .any)["markdownFormatting"].firstMatch
-                XCTAssertEqual(formatting.frame.midX, window.frame.midX, accuracy: 2)
                 let title = app.staticTexts["documentTitle"].firstMatch
-                XCTAssertLessThan(title.frame.maxX, formatting.frame.minX)
+                XCTAssertLessThan(title.frame.maxX, toggle.frame.minX)
+                XCTAssertTrue(toggle.isHittable)
                 XCTAssertTrue(app.buttons["Save"].firstMatch.isHittable)
-                XCTAssertLessThan(formatting.frame.maxX, toggle.frame.minX)
-                if width < 820 {
-                    XCTAssertTrue(app.menuButtons["formattingOverflow"].firstMatch.isHittable)
-                }
+                XCTAssertFalse(app.menuButtons["formattingOverflow"].exists)
+                toggle.click()
+                XCTAssertTrue(app.menuItems["Quote"].firstMatch.waitForExistence(timeout: 5))
+                app.typeKey(.escape, modifierFlags: [])
                 attach(window.screenshot(), name: "\(appearance) long title and formatting at \(Int(width)) points")
                 title.doubleClick()
                 let field = app.textFields["Name"].firstMatch
                 XCTAssertTrue(field.waitForExistence(timeout: 5))
                 XCTAssertFalse(app.staticTexts[".md"].exists)
-                XCTAssertLessThan(field.frame.maxX, formatting.frame.minX)
+                XCTAssertLessThan(field.frame.maxX, toggle.frame.minX)
                 app.typeKey(.escape, modifierFlags: [])
             }
             app.terminate()
