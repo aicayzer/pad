@@ -25,6 +25,7 @@ declare global {
       insertPaths(paths: string[], x: number, y: number): void;
       setAccent(color: string): void;
       setTextSize(px: number): void;
+      setReadingWidth(width: number | null): void;
       setKeymap(keymap: Keymap): void;
     };
   }
@@ -97,6 +98,13 @@ window.editor = {
     document.documentElement.style.setProperty("--accent", color),
   setTextSize: (px) =>
     document.documentElement.style.setProperty("font-size", `${px}px`),
+  setReadingWidth: (width) => {
+    if (width !== null && Number.isFinite(width) && width > 0) {
+      document.documentElement.style.setProperty("--reading-width", `${width}px`);
+    } else {
+      document.documentElement.style.removeProperty("--reading-width");
+    }
+  },
   setKeymap: (keymap) => editor.setKeymap(keymap),
 };
 

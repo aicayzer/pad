@@ -89,6 +89,13 @@ final class PadOnboarding {
         shortcutPressed = false
     }
 
+    func resetCompletion() {
+        dismiss()
+        hasCompleted = false
+        defaults.set(false, forKey: Self.completionKey)
+        resetPractice()
+    }
+
     func complete() {
         clearShortcutPress()
         hasCompleted = true

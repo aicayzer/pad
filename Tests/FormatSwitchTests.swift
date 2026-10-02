@@ -45,6 +45,23 @@ import Testing
         #expect(!document.isBusy)
     }
 
+    @Test func savedFileDoesNotExposeDraftFormatSwitching() async throws {
+        let fixture = try FormatSwitchFixture(selectSaveFile: { _, _ in
+            Issue.record("A locked footer must not present Save As")
+            return nil
+        })
+        defer { fixture.cleanUp() }
+        let original = fixture.root.appending(path: "locked.md")
+        try Data("# Keep the file type".utf8).write(to: original)
+        fixture.document.open(original)
+        let identity = fixture.document.documentID
+        await fixture.document.toggleFormat()
+        #expect(fixture.document.currentFormat == .md)
+        #expect(fixture.document.url == original)
+        #expect(fixture.document.documentID == identity)
+        #expect(fixture.document.text == "# Keep the file type")
+    }
+
     @Test func cancelledSaveAsRetainsLatestEditAndFileFormat() async throws {
         var suggestedName: String?
         let fixture = try FormatSwitchFixture(selectSaveFile: { _, name in suggestedName = name; return nil })
@@ -55,7 +72,7 @@ import Testing
         document.open(original)
         let id = document.documentID
         document.editorSnapshot = { "# Last keystroke\n" }
-        await document.toggleFormat()
+        await document.saveAs(targetFormat: .txt)
         #expect(suggestedName == "thought.txt")
         #expect(document.currentFormat == .md)
         #expect(document.url == original)
@@ -76,7 +93,7 @@ import Testing
         document.open(original)
         let id = document.documentID
         document.editorSnapshot = { source }
-        await document.toggleFormat()
+        await document.saveAs(targetFormat: .txt)
         #expect(document.currentFormat == .txt)
         #expect(document.url == fixture.root.appending(path: "thought.txt"))
         #expect(document.documentID == id)
@@ -96,7 +113,7 @@ import Testing
         let document = fixture.document
         document.open(original)
         document.editorSnapshot = { "latest edit" }
-        await document.toggleFormat()
+        await document.saveAs(targetFormat: .txt)
         #expect(document.currentFormat == .md)
         #expect(document.url == original)
         #expect(document.text == "latest edit")
@@ -115,7 +132,7 @@ import Testing
         try Data("original".utf8).write(to: original)
         fixture.document.open(original)
         fixture.document.editorSnapshot = { throw CocoaError(.fileReadUnknown) }
-        await fixture.document.toggleFormat()
+        await fixture.document.saveAs(targetFormat: .txt)
         #expect(fixture.document.url == original)
         #expect(fixture.document.currentFormat == .md)
         #expect(fixture.document.error != nil)

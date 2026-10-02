@@ -42,8 +42,10 @@ struct PanelTests {
         let suite = "pad-panel-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.set("txt", forKey: "pad.format")
-        let document = PadDocument(defaults: defaults, defaultFolder: root,
-                                   noticeDuration: .milliseconds(150), copyPath: { _ in })
+        let settings = AppSettings(defaults: defaults)
+        let workspace = PadWorkspace(settings: settings, defaults: defaults, defaultFolder: root,
+                                     noticeDuration: .milliseconds(150))
+        let document = workspace.quickPad
         let initialWindows = Set(NSApp.windows.map(ObjectIdentifier.init))
         let trace = PanelActivationTrace()
         defer { trace.stop() }
@@ -92,8 +94,7 @@ struct PanelTests {
 
         // A scratch document must survive opening Settings even when automatic saving is off.
         document.saveAutomatically = false
-        let settings = AppSettings(defaults: defaults)
-        settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(settings).environment(document))
+        settingsWindow.contentView = NSHostingView(rootView: SettingsView().environment(settings).environment(workspace))
         document.showSettings = {
             settingsWindow.makeKeyAndOrderFront(nil)
         }

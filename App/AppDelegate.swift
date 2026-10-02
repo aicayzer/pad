@@ -5,14 +5,14 @@ import KeyboardShortcuts
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let isTestHost = ProcessInfo.processInfo.environment.keys.contains { $0.hasPrefix("XCTest") }
     let settings: AppSettings
-    let document: PadDocument
+    let workspace: PadWorkspace
+    var document: PadDocument { workspace.quickPad }
 
     override init() {
         let defaults = Self.isTestHost ? UserDefaults(suiteName: "tests-\(UUID().uuidString)")! : .standard
         settings = AppSettings(defaults: defaults)
-        document = PadDocument(defaults: defaults, presentsWindow: !Self.isTestHost)
+        workspace = PadWorkspace(settings: settings, defaults: defaults, presentsWindows: !Self.isTestHost)
         super.init()
-        document.appSettings = settings
         if Self.isTestHost { KeyboardShortcuts.isEnabled = false }
     }
 
@@ -37,21 +37,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard !Self.isTestHost else { return }
-        for url in urls where url.isFileURL { document.open(url) }
+        for url in urls where url.isFileURL { workspace.open(url) }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         guard !Self.isTestHost else { return false }
-        document.showCurrent()
+        workspace.reopen()
         return false
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if document.editorSnapshot != nil {
-            Task { sender.reply(toApplicationShouldTerminate: await document.prepareToTerminate()) }
-            return .terminateLater
-        }
-        return document.canTerminate() ? .terminateNow : .terminateCancel
+        Task { sender.reply(toApplicationShouldTerminate: await workspace.prepareToTerminate()) }
+        return .terminateLater
+    }
+
+    func applicationDidChangeScreenParameters(_ notification: Notification) {
+        workspace.screenConfigurationChanged()
     }
 }

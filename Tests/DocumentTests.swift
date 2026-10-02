@@ -130,6 +130,82 @@ import Testing
         #expect(try String(contentsOf: url, encoding: .utf8) == "outside\n")
     }
 
+    @Test(arguments: ["new", "quit"], ["cancel", "save", "discard"])
+    func unsavedScratchRequiresADecisionBeforeDestructiveTransitions(_ action: String, _ choice: String) throws {
+        var prompts = 0
+        let (files, root, _, _) = try fixture(resolveUnsavedChanges: {
+            prompts += 1
+            switch choice {
+            case "save": return .save
+            case "discard": return .discard
+            default: return .cancel
+            }
+        })
+        defer { try? FileManager.default.removeItem(at: root) }
+        files.saveAutomatically = false
+        files.newFile()
+        #expect(files.rename(to: "Retained thought"))
+        files.text = "Keep this unsaved scratch text"
+        let identity = files.documentID
+        if action == "new" {
+            files.commandNew()
+        } else {
+            #expect(files.canTerminate() == (choice != "cancel"))
+        }
+        #expect(prompts == 1)
+        #expect(!files.isBusy)
+        if choice == "cancel" {
+            #expect(files.documentID == identity)
+            #expect(files.url == nil)
+            #expect(files.text == "Keep this unsaved scratch text")
+            #expect(files.editableName == "Retained thought")
+            #expect(files.isDirty)
+        } else if action == "new" {
+            #expect(files.documentID != identity)
+            #expect(files.text.isEmpty)
+            #expect(files.url == nil)
+        } else if choice == "save" {
+            #expect(files.documentID == identity)
+            #expect(files.text == "Keep this unsaved scratch text")
+            #expect(!files.isDirty)
+        } else {
+            #expect(files.text.isEmpty)
+            #expect(!files.isDirty)
+        }
+        let saved = root.appending(path: "Retained thought.txt")
+        if choice == "save" {
+            #expect(try String(contentsOf: saved, encoding: .utf8) == "Keep this unsaved scratch text")
+        } else {
+            #expect(!FileManager.default.fileExists(atPath: saved.path))
+        }
+    }
+
+    @Test func hidingAndExpiringTemporaryScratchDoesNotAskForDestructiveConfirmation() throws {
+        var prompts = 0
+        let (files, root, _, _) = try fixture(resolveUnsavedChanges: {
+            prompts += 1
+            return .cancel
+        })
+        defer { try? FileManager.default.removeItem(at: root) }
+        files.saveAutomatically = false
+        files.reusePeriod = .fiveMinutes
+        let now = Date.now
+        files.newFile(now: now)
+        files.text = "Temporary writing"
+        let identity = files.documentID
+        files.close(now: now)
+        #expect(files.text == "Temporary writing")
+        files.showCurrent(now: now.addingTimeInterval(60))
+        #expect(files.documentID == identity)
+        #expect(files.text == "Temporary writing")
+        files.close(now: now.addingTimeInterval(60))
+        files.showCurrent(now: now.addingTimeInterval(60 + 301))
+        #expect(files.text.isEmpty)
+        #expect(files.documentID != identity)
+        #expect(prompts == 0)
+        #expect(try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).isEmpty)
+    }
+
     @Test func commandNewAlwaysCreatesFreshDocument() throws {
         let (files, root, _, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }

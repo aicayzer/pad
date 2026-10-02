@@ -6,15 +6,18 @@ struct PadApp: App {
 
     var body: some Scene {
         Settings {
-            SettingsView().environment(delegate.settings).environment(delegate.document)
+            SettingsView().environment(delegate.settings).environment(delegate.document).environment(delegate.workspace)
         }
         .windowResizability(.contentSize)
-        .commands { AppCommands(document: delegate.document) }
+        .commands { AppCommands(workspace: delegate.workspace) }
 
         MenuBarExtra(isInserted: Binding(get: { !AppDelegate.isTestHost && delegate.settings.menuBarItem }, set: { delegate.settings.menuBarItem = $0 })) {
             Button("Open \(Bundle.main.displayName)") { delegate.document.showCurrent() }
+                .disabled(delegate.workspace.isTransitioning)
             Button("New Draft") { delegate.document.commandNew() }
+                .disabled(delegate.workspace.isTransitioning)
             Button("Open File…") { Task { await delegate.document.openPicker() } }
+                .disabled(delegate.workspace.isTransitioning)
             Divider()
             SettingsLink { Text("Settings…") }
             Divider()
