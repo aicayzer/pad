@@ -44,6 +44,18 @@ final class AppSettings {
         set {
             textColumnWidthValue = Self.dimension(newValue, fallback: 740, range: 320...3000)
             defaults.set(textColumnWidthValue, forKey: "textColumnWidth")
+            if let presetWidth = textColumnWidthChoiceValue.width, presetWidth != textColumnWidthValue {
+                textColumnWidthChoice = .custom
+            }
+        }
+    }
+    private var textColumnWidthChoiceValue: TextColumnWidthChoice
+    var textColumnWidthChoice: TextColumnWidthChoice {
+        get { textColumnWidthChoiceValue }
+        set {
+            textColumnWidthChoiceValue = newValue
+            defaults.set(newValue.rawValue, forKey: "textColumnWidthChoice")
+            if let width = newValue.width { textColumnWidth = width }
         }
     }
     var limitTextWidth: Bool { didSet { defaults.set(limitTextWidth, forKey: "limitTextWidth") } }
@@ -57,12 +69,20 @@ final class AppSettings {
         value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
     }
 
-    func restoreEditorDefaults() {
+    func restoreQuickPadSize() {
         quickPadWidth = 740
         quickPadHeight = 480
+    }
+
+    func restoreFileWindowSize() {
         fileWindowWidth = 800
         fileWindowHeight = 860
-        textColumnWidth = 740
+    }
+
+    func restoreEditorDefaults() {
+        restoreQuickPadSize()
+        restoreFileWindowSize()
+        textColumnWidthChoice = .standard
         limitTextWidth = true
         snapQuickPadToCenter = true
     }
@@ -101,7 +121,12 @@ final class AppSettings {
         quickPadHeightValue = Self.dimension(defaults.object(forKey: "quickPadHeight") as? Double ?? 480, fallback: 480, range: 320...2400)
         fileWindowWidthValue = Self.dimension(defaults.object(forKey: "fileWindowWidth") as? Double ?? 800, fallback: 800, range: 520...3000)
         fileWindowHeightValue = Self.dimension(defaults.object(forKey: "fileWindowHeight") as? Double ?? 860, fallback: 860, range: 320...2400)
-        textColumnWidthValue = Self.dimension(defaults.object(forKey: "textColumnWidth") as? Double ?? 740, fallback: 740, range: 320...3000)
+        let storedColumnWidth = Self.dimension(defaults.object(forKey: "textColumnWidth") as? Double ?? 740, fallback: 740, range: 320...3000)
+        textColumnWidthValue = storedColumnWidth
+        let storedColumnChoice = TextColumnWidthChoice(rawValue: defaults.string(forKey: "textColumnWidthChoice") ?? "")
+            ?? TextColumnWidthChoice.allCases.first(where: { $0.width == storedColumnWidth }) ?? .custom
+        textColumnWidthChoiceValue = storedColumnChoice
+        textColumnWidthValue = storedColumnChoice.width ?? storedColumnWidth
         limitTextWidth = defaults.object(forKey: "limitTextWidth") == nil ? true : defaults.bool(forKey: "limitTextWidth")
         snapQuickPadToCenter = defaults.object(forKey: "snapQuickPadToCenter") == nil ? true : defaults.bool(forKey: "snapQuickPadToCenter")
         showInDock = defaults.object(forKey: "showInDock") == nil ? true : defaults.bool(forKey: "showInDock")
@@ -272,7 +297,7 @@ enum AccentChoice: String, CaseIterable, Identifiable {
 enum MenuBarIcon: String, CaseIterable, Identifiable {
     case mark, text, compose
     var id: String { rawValue }
-    var title: String { switch self { case .mark: "App icon"; case .text: "Text"; case .compose: "Compose" } }
+    var title: String { switch self { case .mark: "PadPad"; case .text: "Text"; case .compose: "Compose" } }
     @ViewBuilder var image: some View {
         switch self {
         case .mark: Image("MenuBarIcon").renderingMode(.template).resizable().scaledToFit().frame(height: 13)
@@ -289,5 +314,27 @@ enum AppearanceChoice: String, CaseIterable, Identifiable {
     var title: String { switch self { case .system: "System"; case .light: "Light"; case .dark: "Dark" } }
     var nativeAppearance: NSAppearance? {
         switch self { case .system: nil; case .light: NSAppearance(named: .aqua); case .dark: NSAppearance(named: .darkAqua) }
+    }
+}
+
+/// Presets describe the maximum text column, independent of the window width.
+enum TextColumnWidthChoice: String, CaseIterable, Identifiable {
+    case narrow, standard, wide, custom
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .narrow: "Narrow"
+        case .standard: "Standard"
+        case .wide: "Wide"
+        case .custom: "Custom"
+        }
+    }
+    var width: Double? {
+        switch self {
+        case .narrow: 560
+        case .standard: 740
+        case .wide: 920
+        case .custom: nil
+        }
     }
 }

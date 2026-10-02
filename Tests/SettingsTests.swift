@@ -84,6 +84,47 @@ import Testing
         #expect(defaults.object(forKey: "menuBarItem") == nil)
     }
 
+    @Test func widthPresetsAndExplicitCustomChoicePersist() {
+        let suite = "pad-settings-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.textColumnWidthChoice == .standard)
+        settings.textColumnWidthChoice = .wide
+        #expect(settings.readingWidth == 920)
+        #expect(AppSettings(defaults: defaults).textColumnWidthChoice == .wide)
+        settings.textColumnWidthChoice = .custom
+        settings.textColumnWidth = 740
+        let restored = AppSettings(defaults: defaults)
+        #expect(restored.textColumnWidthChoice == .custom)
+        #expect(restored.readingWidth == 740)
+        restored.limitTextWidth = false
+        #expect(restored.readingWidth == nil)
+        #expect(restored.textColumnWidthChoice == .custom)
+    }
+
+    @Test func existingCustomWidthIsPreservedAndSizeResetIsScoped() {
+        let suite = "pad-settings-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(680.0, forKey: "textColumnWidth")
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.textColumnWidthChoice == .custom)
+        #expect(settings.readingWidth == 680)
+        settings.quickPadWidth = 900
+        settings.fileWindowHeight = 1000
+        settings.restoreQuickPadSize()
+        #expect(settings.quickPadWidth == 740)
+        #expect(settings.quickPadHeight == 480)
+        #expect(settings.fileWindowHeight == 1000)
+        #expect(settings.readingWidth == 680)
+        settings.restoreFileWindowSize()
+        #expect(settings.fileWindowHeight == 860)
+        settings.restoreEditorDefaults()
+        #expect(AppSettings(defaults: defaults).textColumnWidthChoice == .standard)
+        #expect(settings.readingWidth == 740)
+    }
+
     @Test func systemAccentUsesMacOSColor() {
         let suite = "pad-settings-tests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
