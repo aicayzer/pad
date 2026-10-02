@@ -20,7 +20,7 @@ struct SettingsView: View {
             Tab("About", systemImage: "info.circle") { about }
         }
         // Fits the tallest settings page while keeping tab changes still.
-        .frame(width: 460, height: 420)
+        .frame(width: 460, height: 440)
         .tint(settings.accentColor)
         .disabled(workspace.isTransitioning)
         .background(WindowReader { window in
@@ -116,12 +116,8 @@ struct SettingsView: View {
                 if settings.accent == .custom {
                     ColorPicker("Accent color", selection: Binding(get: { settings.accentColor }, set: { settings.setCustomAccent($0) }), supportsOpacity: false)
                 }
-                LabeledContent("Menu bar icon") {
-                    MenuBarIconPicker(selection: $settings.menuBarIcon)
-                        .fixedSize()
-                        .accessibilityLabel("Menu bar icon")
-                }
-                .disabled(!settings.menuBarItem)
+                MenuBarIconPicker(selection: $settings.menuBarIcon)
+                    .disabled(!settings.menuBarItem)
             }
         }.formStyle(.grouped)
     }
@@ -130,22 +126,18 @@ struct SettingsView: View {
         @Bindable var settings = settings
         return Form {
             Section {
-                windowSize(width: $settings.quickPadWidth, height: $settings.quickPadHeight,
-                           identifier: "quickPadDefault")
-                Button("Use Current Size") { workspace.useCurrentQuickPadSize() }
-                    .accessibilityIdentifier("useCurrentQuickPadSize")
+                windowSize("Quick pad", width: $settings.quickPadWidth, height: $settings.quickPadHeight,
+                           identifier: "quickPadDefault", actionIdentifier: "useCurrentQuickPadSize") {
+                    workspace.useCurrentQuickPadSize()
+                }
+                windowSize("File windows", width: $settings.fileWindowWidth, height: $settings.fileWindowHeight,
+                           identifier: "fileWindowDefault", actionIdentifier: "useCurrentFileSize",
+                           enabled: workspace.canUseFileSize) {
+                    workspace.useCurrentFileSize()
+                }
                 Toggle("Snap quick pad to center", isOn: $settings.snapQuickPadToCenter)
-            } header: { Text("Quick Pad") } footer: {
-                Text("Resizing the window keeps this default. Choose Window → Restore Default Size to return to it.")
-            }
-            Section {
-                windowSize(width: $settings.fileWindowWidth, height: $settings.fileWindowHeight,
-                           identifier: "fileWindowDefault")
-                Button("Use Current Size") { workspace.useCurrentFileSize() }
-                    .disabled(!workspace.canUseFileSize)
-                    .accessibilityIdentifier("useCurrentFileSize")
-            } header: { Text("File Windows") } footer: {
-                Text("New file windows use this size, adjusted to fit the screen.")
+            } header: { Text("Default Window Sizes") } footer: {
+                Text("Width × height, in points. Restore these sizes from the Window menu.")
             }
             Section {
                 Toggle("Limit text width", isOn: $settings.limitTextWidth)
@@ -157,25 +149,37 @@ struct SettingsView: View {
                 }
                 .disabled(!settings.limitTextWidth)
             } header: { Text("Reading") } footer: {
-                Text("Centers the writing area in wider windows. Narrower windows fit the text to the available space.")
+                Text("Keeps text centered in wider windows.")
             }
         }.formStyle(.grouped)
     }
 
-    private func windowSize(width: Binding<Double>, height: Binding<Double>, identifier: String) -> some View {
-        LabeledContent("Default size") {
-            dimensionField(value: width, label: "Width", identifier: identifier + "Width")
-            Text("×").foregroundStyle(.secondary)
-            dimensionField(value: height, label: "Height", identifier: identifier + "Height")
-            Text("pt").foregroundStyle(.secondary)
+    private func windowSize(_ label: String, width: Binding<Double>, height: Binding<Double>,
+                            identifier: String, actionIdentifier: String, enabled: Bool = true,
+                            action: @escaping () -> Void) -> some View {
+        LabeledContent(label) {
+            HStack(spacing: 8) {
+                dimensionField(value: width, label: "\(label) width", identifier: identifier + "Width")
+                Text("×").foregroundStyle(.secondary)
+                dimensionField(value: height, label: "\(label) height", identifier: identifier + "Height")
+                Button("Use Current Size", action: action)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(.primary)
+                    .disabled(!enabled)
+                    .accessibilityIdentifier(actionIdentifier)
+                    .help("Use the current \(label.lowercased()) size as its default")
+            }
+            .fixedSize(horizontal: true, vertical: false)
         }
     }
 
     private func dimensionField(value: Binding<Double>, label: String, identifier: String) -> some View {
         TextField(label, value: value, format: .number.precision(.fractionLength(0)))
             .textFieldStyle(.roundedBorder)
+            .labelsHidden()
             .multilineTextAlignment(.trailing)
-            .frame(width: 62)
+            .frame(width: 52)
             .accessibilityLabel(label)
             .accessibilityIdentifier(identifier)
     }
@@ -306,11 +310,11 @@ struct SettingsView: View {
                 .shortcutValidation { document.editingShortcuts.validateGlobal($0) }
             }
             Section("Window") {
-                LabeledContent("Restore Default Size", value: document.editingShortcuts.restoreSizeShortcutAvailable
-                               ? "⌘0" : "Use the Window menu")
+                EditingShortcutSettings(shortcuts: document.editingShortcuts, actions: [.restoreDefaultSize])
             }
             Section {
-                EditingShortcutSettings(shortcuts: document.editingShortcuts)
+                EditingShortcutSettings(shortcuts: document.editingShortcuts,
+                                        actions: [.newFile, .open, .save, .saveAs, .copyAllContents])
             } header: {
                 Text("While Editing")
             } footer: {
@@ -319,9 +323,6 @@ struct SettingsView: View {
                         Text(error).foregroundStyle(.red).font(.caption)
                     }
                     HStack {
-                        if document.editingShortcuts.copyAllShortcutAvailable {
-                            Text("Copy All Contents: ⇧⌘C").font(.caption).foregroundStyle(.secondary)
-                        }
                         Spacer()
                         Button("Restore Defaults") { document.editingShortcuts.restoreDefaults() }
                             .tint(.primary)
