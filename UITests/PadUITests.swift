@@ -619,6 +619,30 @@ final class PadUITests: XCTestCase {
         app.menuItems["Dock and menu bar"].click()
     }
 
+    func testOptionShiftBReopensHiddenMarkdownFromFinder() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-pad.onboardingCompleted", "YES", "-pad.format", "md",
+                               "-pad.saveAutomatically", "NO", "-pad.floating", "YES",
+                               "-showInDock", "YES", "-menuBarItem", "NO",
+                               "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":11,\"carbonModifiers\":2560}""#]
+        app.launch()
+        defer { app.terminate() }
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        let close = app.buttons["Close PadPad"].firstMatch
+        XCTAssertFalse(close.exists)
+        finder.activate()
+        finder.typeKey("b", modifierFlags: [.option, .shift])
+        XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.menuButtons["formattingMenu"].firstMatch.waitForExistence(timeout: 10))
+        app.typeText("Retained Markdown")
+        finder.activate()
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: close)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed)
+        finder.typeKey("b", modifierFlags: [.option, .shift])
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "The shortcut must show hidden Markdown before snapshotting")
+    }
+
     private func launchPad(floating: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()

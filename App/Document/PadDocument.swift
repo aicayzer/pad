@@ -426,7 +426,8 @@ final class PadDocument {
     func toggle(now: Date = .now) {
         guard !isBusy else { return }
         if onboarding.isPresented { show(); return }
-        if synchronizeEditorThen({ self.toggle(now: now) }) { return }
+        // Hiding already captures the editor. Reopening must not wait on JavaScript
+        // in an offscreen WebKit view; show the retained document immediately.
         if presentOnboardingIfNeeded() { return }
         guard !isBusy else { return }
         if isVisible {
@@ -437,7 +438,7 @@ final class PadDocument {
         } else {
             // Expired temporary drafts deliberately clear without a save prompt.
             resetDocument()
-            newFile(now: now)
+            show()
         }
     }
 
