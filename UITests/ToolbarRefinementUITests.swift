@@ -12,8 +12,6 @@ final class ToolbarRefinementUITests: XCTestCase {
         expectReady(toggle)
         app.typeText("Selected words")
         let title = app.staticTexts["documentTitle"].firstMatch
-        let dirty = app.descendants(matching: .any)["unsavedIndicator"].firstMatch
-        XCTAssertFalse(dirty.exists, "Drafts do not show a saved-file changes badge")
         title.doubleClick()
         let name = app.textFields["Name"].firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
@@ -115,8 +113,6 @@ final class ToolbarRefinementUITests: XCTestCase {
                 let formatting = app.descendants(matching: .any)["markdownFormatting"].firstMatch
                 XCTAssertEqual(formatting.frame.midX, window.frame.midX, accuracy: 2)
                 let title = app.staticTexts["documentTitle"].firstMatch
-                let dirty = app.descendants(matching: .any)["unsavedIndicator"].firstMatch
-                XCTAssertFalse(dirty.exists)
                 XCTAssertLessThan(title.frame.maxX, formatting.frame.minX)
                 XCTAssertTrue(app.buttons["Save"].firstMatch.isHittable)
                 XCTAssertLessThan(formatting.frame.maxX, toggle.frame.minX)

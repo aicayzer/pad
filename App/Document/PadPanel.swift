@@ -411,17 +411,7 @@ private struct PadView: View {
                                     .simultaneousGesture(WindowDragGesture())
                             }
 
-                            if files.url != nil, files.isDirty {
-                                Text("Unsaved")
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(.quaternary, in: Capsule())
-                                    .fixedSize()
-                                    .accessibilityLabel("Unsaved changes")
-                                    .accessibilityIdentifier("unsavedIndicator")
-                            }
+
                         }
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
                         Spacer(minLength: 0)
