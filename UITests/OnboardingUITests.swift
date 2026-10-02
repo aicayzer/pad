@@ -238,16 +238,27 @@ final class OnboardingUITests: XCTestCase {
         attach(settings.screenshot(), name: "Editor settings keep sizing and text width controls reachable")
 
         selectTab("Files", in: settings)
-        expectHittable(element("File name", in: settings))
+        let filename = element("File name", in: settings)
+        for _ in 0..<3 where !filename.isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
+        }
+        expectHittable(filename)
         expectHittable(element("Insert filename variable", in: settings))
         expectSize(size, of: settings)
         attach(settings.screenshot(), name: "Compact Files settings with naming controls visible")
 
         selectTab("Shortcuts", in: settings)
-        expectHittable(settings.searchFields["editingShortcut.saveAs"].firstMatch)
+        let saveAs = settings.searchFields["editingShortcut.saveAs"].firstMatch
+        for _ in 0..<3 where !saveAs.isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
+        }
+        expectHittable(saveAs)
         // Restore Defaults is intentionally disabled for a default fixture, but must be visible.
         let restore = settings.buttons["Restore Defaults"].firstMatch
         XCTAssertTrue(restore.exists, settings.debugDescription)
+        for _ in 0..<3 where !settings.frame.contains(restore.frame) {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -100)
+        }
         XCTAssertTrue(settings.frame.contains(restore.frame), settings.debugDescription)
         expectSize(size, of: settings)
         attach(settings.screenshot(), name: "Compact Shortcuts settings with the last recorder visible")
