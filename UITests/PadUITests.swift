@@ -554,7 +554,7 @@ final class PadUITests: XCTestCase {
         selectTab("General", in: settings)
         expectValue("Menu bar", in: settings.popUpButtons["appAccess"])
         XCTAssertTrue(settings.staticTexts["Open at login"].firstMatch.exists)
-        XCTAssertTrue(settings.staticTexts["Always on top"].firstMatch.exists)
+        XCTAssertTrue(settings.staticTexts["Keep quick pad on top"].firstMatch.exists)
         checkDock("Settings open")
         selectTab("Shortcuts", in: settings)
         expectValue("⌃⌥⌘B", in: settings.searchFields.firstMatch)

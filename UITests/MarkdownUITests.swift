@@ -254,7 +254,7 @@ final class MarkdownUITests: XCTestCase {
                 add(evidence)
             }
             XCTAssertEqual(restored, original, "Authored spacing changed on reopen cycle \(cycle)")
-            attach(app.dialogs.firstMatch.screenshot(), name: "Blank paragraphs retained after reopen cycle \(cycle)")
+            attach(fileWindow.screenshot(), name: "Blank paragraphs retained after reopen cycle \(cycle)")
         }
     }
 
@@ -339,7 +339,7 @@ final class MarkdownUITests: XCTestCase {
         waitForEditor(app, in: fileWindow)
         app.typeKey("c", modifierFlags: [.command, .shift])
         waitForClipboard(expected)
-        attach(app.dialogs.firstMatch.screenshot(), name: "Edited Markdown reopened with separate soft-break lines")
+        attach(fileWindow.screenshot(), name: "Edited Markdown reopened with separate soft-break lines")
     }
 
     private func waitForClipboard(_ expected: String) {

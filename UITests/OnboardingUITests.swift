@@ -196,7 +196,7 @@ final class OnboardingUITests: XCTestCase {
         let settings = openSettings(app)
         selectTab("About", in: settings)
         settings.buttons["resetApp"].click()
-        let confirmation = app.alerts.firstMatch
+        let confirmation = settings.sheets.firstMatch
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(confirmation.staticTexts["Reset PadPad?"].exists)
         confirmation.buttons["Cancel"].click()
@@ -225,11 +225,15 @@ final class OnboardingUITests: XCTestCase {
         attach(settings.screenshot(), name: "Compact General settings with the bottom icon control visible")
 
         selectTab("Editor", in: settings)
-        expectHittable(element("limitTextWidth", in: settings))
         expectHittable(settings.buttons["useCurrentQuickPadSize"].firstMatch)
         XCTAssertTrue(settings.buttons["useCurrentFileSize"].exists)
         XCTAssertFalse(settings.buttons["useCurrentFileSize"].isEnabled,
                        "Use Current File Size requires an open file window")
+        let readingWidth = element("limitTextWidth", in: settings)
+        for _ in 0..<3 where !readingWidth.isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
+        }
+        expectHittable(readingWidth)
         expectSize(size, of: settings)
         attach(settings.screenshot(), name: "Editor settings keep sizing and text width controls reachable")
 
