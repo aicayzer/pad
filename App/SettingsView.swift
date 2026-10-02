@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var settingsWindow: NSWindow?
     @State private var showingResetConfirmation = false
     @State private var resetting = false
+    @FocusState private var editingDimension: String?
 
     var body: some View {
         TabView {
@@ -27,6 +28,9 @@ struct SettingsView: View {
             settingsWindow = window
             window.level = document.floating ? .floating : .normal
             document.settingsPresented = true
+        })
+        .background(SettingsEditingDismissal(isEditing: editingDimension != nil) {
+            editingDimension = nil
         })
         .onChange(of: document.floating) { _, floating in
             settingsWindow?.level = floating ? .floating : .normal
@@ -166,7 +170,7 @@ struct SettingsView: View {
                             identifier: String, optionsIdentifier: String, actionIdentifier: String, canUseCurrent: Bool = true,
                             useCurrent: @escaping () -> Void, restore: @escaping () -> Void) -> some View {
         LabeledContent(label) {
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 dimensionField(value: width, label: "\(label) width", identifier: identifier + "Width")
                 Text("×").foregroundStyle(.secondary)
                 dimensionField(value: height, label: "\(label) height", identifier: identifier + "Height")
@@ -180,6 +184,8 @@ struct SettingsView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                 }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .tint(.primary)
@@ -196,6 +202,8 @@ struct SettingsView: View {
             .labelsHidden()
             .multilineTextAlignment(.trailing)
             .frame(width: 52)
+            .focused($editingDimension, equals: identifier)
+            .onExitCommand { editingDimension = nil }
             .accessibilityLabel(label)
             .accessibilityIdentifier(identifier)
     }
@@ -210,8 +218,6 @@ struct SettingsView: View {
                     Text("Plain text (.txt)").tag(PadFormat.txt)
                 }
                 .tint(.primary)
-                Toggle("Show format switch", isOn: $settings.showFormatToggle)
-                    .accessibilityIdentifier("showFormatToggle")
                 Toggle("Save automatically", isOn: $document.saveAutomatically)
                 Picker("Clear draft", selection: $document.reusePeriod) {
                     ForEach(PadReuse.allCases) { period in
@@ -220,6 +226,8 @@ struct SettingsView: View {
                 }
                 .tint(.primary)
                 .accessibilityIdentifier("draftLifetime")
+                Toggle("Show format switch", isOn: $settings.showFormatToggle)
+                    .accessibilityIdentifier("showFormatToggle")
             } header: { Text("Quick pad") } footer: {
                 Text(draftExplanation)
             }
@@ -233,6 +241,8 @@ struct SettingsView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                     }
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
                     .menuIndicator(.hidden)
                     .fixedSize()
                     .tint(.primary)
@@ -262,12 +272,12 @@ struct SettingsView: View {
 
     private var draftExplanation: String {
         if document.saveAutomatically {
-            return "Saves the quick pad when you close it or switch apps. Opened files save when you choose Save."
+            return "Quick pad saves on close or when switching apps. Save opened files manually."
         }
         if document.reusePeriod == .alwaysNew {
-            return "Clears temporary drafts each time you reopen the quick pad. Saved files and their edits are kept."
+            return "Clears temporary drafts on reopening. Saved files are kept."
         }
-        return "Clears temporary drafts after \(document.reusePeriod.title) away. Saved files and their edits are kept."
+        return "Clears temporary drafts after \(document.reusePeriod.title) away. Saved files are kept."
     }
 
     private var about: some View {
