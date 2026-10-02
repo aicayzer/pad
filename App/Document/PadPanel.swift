@@ -609,7 +609,7 @@ private struct PadView: View {
                             .onAppear { files.mountMarkdownEditor() }
                     }
                 } else {
-                    PadPlainTextEditorView(text: $files.text, maxColumnWidth: readingColumnWidth)
+                    PadPlainTextEditorView(text: $files.text, maxColumnWidth: readingColumnWidth.map { CGFloat($0) })
                         .id(files.documentID)
                         .background(EditorFocusMount())
                         .focused($editing)
