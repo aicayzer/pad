@@ -603,6 +603,8 @@ private struct PadFormatButtonStyle: ButtonStyle {
             .frame(minWidth: 24, minHeight: 16)
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.85),
+                        in: RoundedRectangle(cornerRadius: 5))
             .glassEffect(isEnabled && (hovered || isFocused || configuration.isPressed) ? .regular : .identity,
                          in: .rect(cornerRadius: 5))
             .opacity(configuration.isPressed ? 0.7 : 1)
