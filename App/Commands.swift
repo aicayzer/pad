@@ -31,7 +31,7 @@ struct AppCommands: Commands {
         }
         CommandGroup(after: .pasteboard) {
             Button("Copy All Contents") { Task { await document.copyAllContents() } }
-                .keyboardShortcut(document.editingShortcuts.copyAllShortcutAvailable ? KeyboardShortcut("c", modifiers: [.command, .shift]) : nil)
+                .keyboardShortcut(document.editingShortcuts.shortcut(for: .copyAllContents)?.toSwiftUI)
                 .disabled(!canEdit)
             Button("Copy as Markdown") { Task { await document.copyAllContents(asMarkdown: true) } }
                 .disabled(!canEdit || document.currentFormat != .md)
@@ -44,7 +44,7 @@ struct AppCommands: Commands {
         }
         CommandGroup(after: .windowSize) {
             Button("Restore Default Size") { document.restoreDefaultSize() }
-                .keyboardShortcut(document.editingShortcuts.restoreSizeShortcutAvailable ? KeyboardShortcut("0", modifiers: .command) : nil)
+                .keyboardShortcut(document.editingShortcuts.shortcut(for: .restoreDefaultSize)?.toSwiftUI)
                 .disabled(!canEdit)
             Divider()
             Button("Quick Pad") { workspace.quickPad.showCurrent() }

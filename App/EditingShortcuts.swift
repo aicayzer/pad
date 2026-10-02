@@ -3,7 +3,7 @@ import KeyboardShortcuts
 import Observation
 
 enum EditingAction: String, CaseIterable, Identifiable, Codable {
-    case newFile, open, save, saveAs
+    case newFile, open, save, saveAs, restoreDefaultSize, copyAllContents
 
     var id: String { rawValue }
     var title: String {
@@ -12,6 +12,8 @@ enum EditingAction: String, CaseIterable, Identifiable, Codable {
         case .open: "Open File"
         case .save: "Save"
         case .saveAs: "Save As"
+        case .restoreDefaultSize: "Restore Default Size"
+        case .copyAllContents: "Copy All Contents"
         }
     }
     var defaultShortcut: KeyboardShortcuts.Shortcut {
@@ -20,6 +22,8 @@ enum EditingAction: String, CaseIterable, Identifiable, Codable {
         case .open: .init(.o, modifiers: .command)
         case .save: .init(.s, modifiers: .command)
         case .saveAs: .init(.s, modifiers: [.command, .shift])
+        case .restoreDefaultSize: .init(.zero, modifiers: .command)
+        case .copyAllContents: .init(.c, modifiers: [.command, .shift])
         }
     }
 }
@@ -38,10 +42,21 @@ final class EditingShortcuts {
         self.defaults = defaults
         self.globalShortcut = globalShortcut
         if let data = defaults.data(forKey: Self.preferenceKey),
-           let saved = try? JSONDecoder().decode([EditingAction: KeyboardShortcuts.Shortcut].self, from: data) {
-            shortcuts = saved
+           let saved = try? JSONDecoder().decode([EditingAction: KeyboardShortcuts.Shortcut?].self, from: data) {
+            shortcuts = saved.compactMapValues { $0 }
+            // Missing original actions were explicitly disabled. Only newly introduced
+            // actions receive defaults, and existing assignments always take priority.
+            for action in [EditingAction.restoreDefaultSize, .copyAllContents] where !saved.keys.contains(action) {
+                let shortcut = action.defaultShortcut
+                if globalShortcut() != shortcut && !shortcuts.values.contains(shortcut) {
+                    shortcuts[action] = shortcut
+                }
+            }
         } else {
             shortcuts = Self.standardShortcuts
+            for action in [EditingAction.restoreDefaultSize, .copyAllContents] where globalShortcut() == action.defaultShortcut {
+                shortcuts[action] = nil
+            }
         }
     }
 
@@ -50,16 +65,6 @@ final class EditingShortcuts {
     }
 
     var isDefault: Bool { shortcuts == Self.standardShortcuts }
-
-    var restoreSizeShortcutAvailable: Bool {
-        let shortcut = KeyboardShortcuts.Shortcut(.zero, modifiers: .command)
-        return globalShortcut() != shortcut && !shortcuts.values.contains(shortcut)
-    }
-
-    var copyAllShortcutAvailable: Bool {
-        let shortcut = KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .shift])
-        return globalShortcut() != shortcut && !shortcuts.values.contains(shortcut)
-    }
 
     func shortcut(for action: EditingAction) -> KeyboardShortcuts.Shortcut? { shortcuts[action] }
 
@@ -73,10 +78,20 @@ final class EditingShortcuts {
             return .disallow(reason: "Use a shortcut that includes Command.")
         }
         // Keep native editing, navigation, and application commands available.
-        let reservedKeys: Set<KeyboardShortcuts.Key> = [.a, .c, .v, .x, .z, .f, .h, .m, .w, .q, .comma,
-                                                       .leftArrow, .rightArrow, .upArrow, .downArrow, .delete, .deleteForward]
-        if let key = shortcut.key, reservedKeys.contains(key) {
-            return .disallow(reason: "This key is reserved for text editing or an app command.")
+        let nativeCommands: [KeyboardShortcuts.Shortcut] = [
+            .init(.a, modifiers: .command), .init(.c, modifiers: .command),
+            .init(.v, modifiers: .command), .init(.v, modifiers: [.command, .shift]),
+            .init(.v, modifiers: [.command, .option, .shift]), .init(.x, modifiers: .command),
+            .init(.z, modifiers: .command), .init(.z, modifiers: [.command, .shift]),
+            .init(.f, modifiers: .command), .init(.h, modifiers: .command),
+            .init(.h, modifiers: [.command, .option]), .init(.m, modifiers: .command),
+            .init(.m, modifiers: [.command, .option]), .init(.w, modifiers: .command),
+            .init(.w, modifiers: [.command, .option]), .init(.q, modifiers: .command),
+            .init(.comma, modifiers: .command), .init(.r, modifiers: .command)
+        ]
+        let navigationKeys: Set<KeyboardShortcuts.Key> = [.leftArrow, .rightArrow, .upArrow, .downArrow, .delete, .deleteForward]
+        if nativeCommands.contains(shortcut) || shortcut.key.map({ navigationKeys.contains($0) }) == true {
+            return .disallow(reason: "This shortcut is reserved for text editing or an app command.")
         }
         if globalShortcut() == shortcut {
             return .disallow(reason: "This shortcut already shows or hides PadPad.")
@@ -88,9 +103,6 @@ final class EditingShortcuts {
     }
 
     func validateGlobal(_ shortcut: KeyboardShortcuts.Shortcut) -> KeyboardShortcuts.ValidationResult {
-        if shortcut == .init(.c, modifiers: [.command, .shift]) {
-            return .disallow(reason: "This shortcut copies all contents while editing.")
-        }
         if let action = EditingAction.allCases.first(where: { shortcuts[$0] == shortcut }) {
             return .disallow(reason: "This shortcut is already used by \(action.title).")
         }
@@ -118,7 +130,8 @@ final class EditingShortcuts {
     }
 
     private func persist() {
-        if let data = try? JSONEncoder().encode(shortcuts) {
+        let saved = Dictionary(uniqueKeysWithValues: EditingAction.allCases.map { ($0, shortcuts[$0]) })
+        if let data = try? JSONEncoder().encode(saved) {
             defaults.set(data, forKey: Self.preferenceKey)
         }
         error = nil
