@@ -309,14 +309,12 @@ struct SettingsView: View {
                 }
                 .shortcutValidation { document.editingShortcuts.validateGlobal($0) }
             }
-            Section("Window") {
-                EditingShortcutSettings(shortcuts: document.editingShortcuts, actions: [.restoreDefaultSize])
-            }
             Section {
                 EditingShortcutSettings(shortcuts: document.editingShortcuts,
-                                        actions: [.newFile, .open, .save, .saveAs, .copyAllContents])
+                                        actions: [.newFile, .open, .save, .saveAs, .copyAllContents,
+                                                  .restoreDefaultSize])
             } header: {
-                Text("While Editing")
+                Text("In PadPad")
             } footer: {
                 VStack(alignment: .trailing, spacing: 8) {
                     if let error = document.editingShortcuts.error {
