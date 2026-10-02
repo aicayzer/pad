@@ -497,9 +497,6 @@ private struct PadView: View {
                         .padding([.horizontal, .top], 10)
                 }
                 HStack(alignment: .bottom, spacing: 12) {
-                    DevelopmentBadge()
-                        .fixedSize()
-                        .glassEffect(.regular, in: .capsule)
                     if let notice = files.notice {
                         Text(notice)
                             .foregroundStyle(.secondary)
@@ -595,6 +592,10 @@ private struct PadView: View {
 }
 
 private struct PadFormatButtonStyle: ButtonStyle {
+    @Environment(\.isFocused) private var isFocused
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovered = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .medium))
@@ -602,9 +603,11 @@ private struct PadFormatButtonStyle: ButtonStyle {
             .frame(minWidth: 24, minHeight: 16)
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
-            .glassEffect(.regular, in: .rect(cornerRadius: 5))
+            .glassEffect(isEnabled && (hovered || isFocused || configuration.isPressed) ? .regular : .identity,
+                         in: .rect(cornerRadius: 5))
             .opacity(configuration.isPressed ? 0.7 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 5))
+            .onHover { hovered = $0 }
     }
 }
 

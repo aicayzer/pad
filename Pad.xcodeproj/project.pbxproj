@@ -41,7 +41,6 @@
 		AEECD88F21AC692E219E1451 /* AppIconDEV.icon in Resources */ = {isa = PBXBuildFile; fileRef = 621D41FA4140656C065BF7AB /* AppIconDEV.icon */; };
 		B1F5177795B98FEDD4CF958A /* OnboardingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CB4289D8878A8C20969388 /* OnboardingTests.swift */; };
 		BA1EC19F6B9F64C9F2D9D824 /* EditingShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5022E10846FC0482266233 /* EditingShortcutTests.swift */; };
-		BEB7038FF6BEAE822F7FDD53 /* DevelopmentBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */; };
 		C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A999B97A56ADD25994D11B77 /* PadUITests.swift */; };
 		C53F5B43A8E926B392C18919 /* MarkdownBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BECEC51394BCF6B42FC781 /* MarkdownBridgeTests.swift */; };
 		CB590659BD3738417238C9AA /* FormatSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB11A6F21BAFD1B9394BB9A /* FormatSwitchTests.swift */; };
@@ -126,7 +125,6 @@
 		EAE79ABF7E75FFB0C920CAE5 /* OnboardingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingUITests.swift; sourceTree = "<group>"; };
 		F090DDD7F891EC2078684A69 /* PlainTextSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlainTextSelectionTests.swift; sourceTree = "<group>"; };
 		F130D4E74E9170781D810291 /* MarkdownInputBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownInputBuffer.swift; sourceTree = "<group>"; };
-		F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentBadge.swift; sourceTree = "<group>"; };
 		FD7CF2FD18E4F9D6EC9BA2DB /* PadTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PadTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -258,7 +256,6 @@
 				8973E101DCBB6B34544E1C63 /* AppDelegate.swift */,
 				C376BFA6787DB6FC30A88D8B /* AppSettings.swift */,
 				22FEF301DA1CA940EC7E4697 /* Commands.swift */,
-				F61C1F14F5D03B6D87606072 /* DevelopmentBadge.swift */,
 				49911DB95E3D6EA38BE56605 /* EditingShortcuts.swift */,
 				2C16634974372D9E6C8040DF /* EditingShortcutSettings.swift */,
 				6693BC5C8FE6E04C011F7632 /* Info.plist */,
@@ -424,7 +421,6 @@
 				D52ADB49D8B0EF9B37F57D43 /* AppDelegate.swift in Sources */,
 				0CAAEF1C3A635923D1279E8C /* AppSettings.swift in Sources */,
 				A773212ECD37748C92EC805B /* Commands.swift in Sources */,
-				BEB7038FF6BEAE822F7FDD53 /* DevelopmentBadge.swift in Sources */,
 				526DCE0C48A6A195CF22E1AA /* EditingShortcutSettings.swift in Sources */,
 				4A9D05F8B6B3F70EB3E35D6B /* EditingShortcuts.swift in Sources */,
 				72F23CF65A1E51473CA9B6F3 /* LoginItemSettings.swift in Sources */,

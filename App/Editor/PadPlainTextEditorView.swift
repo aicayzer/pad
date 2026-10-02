@@ -46,6 +46,7 @@ struct PadPlainTextEditorView: NSViewRepresentable {
         context.coordinator.text = $text
         guard let editor = scroll.documentView as? NSTextView, editor.string != text else { return }
         editor.string = text
+        editor.needsDisplay = true
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
@@ -60,6 +61,22 @@ struct PadPlainTextEditorView: NSViewRepresentable {
 }
 
 private final class PadPlainTextView: NSTextView {
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard string.isEmpty else { return }
+        let origin = NSPoint(x: textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0),
+                             y: textContainerOrigin.y)
+        ("Start typing…" as NSString).draw(at: origin, withAttributes: [
+            .font: font ?? NSFont.systemFont(ofSize: 15),
+            .foregroundColor: NSColor.placeholderTextColor
+        ])
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        needsDisplay = true
+    }
+
     override var textContainerOrigin: NSPoint {
         // Keep the existing top alignment. Both vertical insets become trailing
         // scrollable space so the final line can clear the floating footer.

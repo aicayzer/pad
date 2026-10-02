@@ -85,7 +85,6 @@ struct PadOnboardingView: View {
             .accessibilityIdentifier("onboardingClose")
             .help("Close PadPad")
             Spacer()
-            DevelopmentBadge()
         }
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
