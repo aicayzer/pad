@@ -77,9 +77,14 @@ struct OverlaySearchField: NSViewRepresentable {
         }
 
         func controlTextDidEndEditing(_ notification: Notification) {
-            guard notification.object is OverlayTextField, parent.isCurrent() else { return }
-            // Commit before the clicked button's action, especially Save, runs.
-            parent.blur?()
+            guard let field = notification.object as? OverlayTextField, field.hasFocused else { return }
+            let owner = parent
+            // AppKit can emit this while installing the field editor. Check the
+            // settled responder; outside clicks commit synchronously in the monitor.
+            DispatchQueue.main.async { [weak field] in
+                guard let field, field.currentEditor() == nil, owner.isCurrent() else { return }
+                owner.blur?()
+            }
         }
     }
 }
