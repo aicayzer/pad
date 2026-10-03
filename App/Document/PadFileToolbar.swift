@@ -5,9 +5,7 @@ import SwiftUI
 @MainActor
 final class PadFileToolbar: NSObject, NSToolbarDelegate {
     private let files: PadDocument
-    private let formatting = NSToolbarItem.Identifier("pad-formatting")
-    private let sharing = NSToolbarItem.Identifier("pad-sharing")
-    private let saving = NSToolbarItem.Identifier("pad-saving")
+    private let actions = NSToolbarItem.Identifier("pad-file-actions")
     let toolbar = NSToolbar(identifier: "pad-file-toolbar")
 
     init(files: PadDocument) {
@@ -19,7 +17,7 @@ final class PadFileToolbar: NSObject, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, formatting, sharing, saving]
+        [.flexibleSpace, actions]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -28,27 +26,25 @@ final class PadFileToolbar: NSObject, NSToolbarDelegate {
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard identifier == actions else { return nil }
         let item = NSToolbarItem(itemIdentifier: identifier)
-        switch identifier {
-        case formatting:
-            item.label = "Formatting"
-            item.view = NSHostingView(rootView: FileFormattingControl(files: files))
-        case sharing:
-            item.label = "Share"
-            item.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share")
-            item.target = self
-            item.action = #selector(share(_:))
-        case saving:
-            item.label = "Save"
-            item.view = NSHostingView(rootView: FileSaveControl(files: files))
-        default:
-            return nil
-        }
+        item.label = "Document actions"
+        let width: CGFloat = files.currentFormat == .md ? 152 : 108
+        let host = NSHostingView(rootView: FileToolbarControls(files: files, share: { [weak self] in
+            guard let self else { return }
+            files.share(from: toolbar.items.first(where: { $0.itemIdentifier == actions })?.view)
+        }).frame(width: width, height: 28))
+        // The toolbar owns this fixed-size slot. Do not let hosting constraints
+        // expand the native glass group or assign different baselines to its controls.
+        host.sizingOptions = []
+        host.frame = NSRect(x: 0, y: 0, width: width, height: 28)
+        host.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            host.widthAnchor.constraint(equalToConstant: width),
+            host.heightAnchor.constraint(equalToConstant: 28)
+        ])
+        item.view = host
         return item
-    }
-
-    @objc private func share(_ sender: NSToolbarItem) {
-        files.share(from: sender.view)
     }
 }
 
@@ -74,13 +70,25 @@ private struct FileFormattingControl: View {
     }
 }
 
-private struct FileSaveControl: View {
+private struct FileToolbarControls: View {
     let files: PadDocument
+    let share: () -> Void
 
     var body: some View {
-        Button("Save") { files.save() }
-            .buttonStyle(.bordered)
-            .disabled(!files.isDirty)
-            .frame(width: 64, height: 28)
+        HStack(spacing: 12) {
+            if files.currentFormat == .md {
+                FileFormattingControl(files: files)
+            }
+            Button(action: share) {
+                Image(systemName: "square.and.arrow.up")
+                    .frame(width: 28, height: 28)
+            }
+            .help("Share")
+            .accessibilityLabel("Share")
+            Button("Save") { files.save() }
+                .disabled(!files.isDirty)
+                .frame(width: 52, height: 28)
+        }
+        .buttonStyle(.plain)
     }
 }
