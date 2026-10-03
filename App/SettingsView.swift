@@ -131,11 +131,11 @@ struct SettingsView: View {
         return Form {
             Section {
                 windowSize("Quick pad", width: $settings.quickPadWidth, height: $settings.quickPadHeight,
-                           identifier: "quickPadDefault", optionsIdentifier: "quickPadSizeOptions", actionIdentifier: "useCurrentQuickPadSize",
+                           identifier: "quickPadDefault", optionsIdentifier: "quickPadSizeOptions",
                            useCurrent: { workspace.useCurrentQuickPadSize() },
                            restore: { settings.restoreQuickPadSize() })
                 windowSize("File windows", width: $settings.fileWindowWidth, height: $settings.fileWindowHeight,
-                           identifier: "fileWindowDefault", optionsIdentifier: "fileWindowSizeOptions", actionIdentifier: "useCurrentFileSize",
+                           identifier: "fileWindowDefault", optionsIdentifier: "fileWindowSizeOptions",
                            canUseCurrent: workspace.canUseFileSize,
                            useCurrent: { workspace.useCurrentFileSize() },
                            restore: { settings.restoreFileWindowSize() })
@@ -167,30 +167,18 @@ struct SettingsView: View {
     }
 
     private func windowSize(_ label: String, width: Binding<Double>, height: Binding<Double>,
-                            identifier: String, optionsIdentifier: String, actionIdentifier: String, canUseCurrent: Bool = true,
+                            identifier: String, optionsIdentifier: String, canUseCurrent: Bool = true,
                             useCurrent: @escaping () -> Void, restore: @escaping () -> Void) -> some View {
         LabeledContent(label) {
             HStack(spacing: 4) {
                 dimensionField(value: width, label: "\(label) width", identifier: identifier + "Width")
                 Text("×").foregroundStyle(.secondary)
                 dimensionField(value: height, label: "\(label) height", identifier: identifier + "Height")
-                Menu {
-                    Button("Use Current Size", action: useCurrent)
-                        .disabled(!canUseCurrent)
-                        .accessibilityIdentifier(actionIdentifier)
-                    Divider()
-                    Button("Restore Default", action: restore)
-                        .accessibilityIdentifier(identifier + "Restore")
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .tint(.primary)
-                .accessibilityLabel("\(label) size options")
-                .accessibilityIdentifier(optionsIdentifier)
+                SettingsOptionsMenu(label: "\(label) size options", identifier: optionsIdentifier,
+                                    primaryTitle: "Use Current Size", primaryEnabled: canUseCurrent,
+                                    primary: useCurrent, secondaryTitle: "Restore Default", secondary: restore)
+                    .frame(width: 18, height: 22)
+                    .padding(.leading, 2)
             }
             .fixedSize(horizontal: true, vertical: false)
         }
@@ -234,20 +222,12 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Folder") {
                     Text(document.folder.lastPathComponent).foregroundStyle(.secondary).lineLimit(1).help(document.folder.path)
-                    Menu {
-                        Button("Choose Folder…") { Task { await document.chooseFolder(parent: settingsWindow) } }
-                        Button("Use Downloads") { document.useDownloads() }
-                            .disabled(document.isDefaultFolder)
-                    } label: {
-                        Image(systemName: "ellipsis")
-                    }
-                    .menuStyle(.button)
-                    .buttonStyle(.plain)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                    .tint(.primary)
-                    .accessibilityLabel("Save folder options")
-                    .accessibilityIdentifier("saveFolderOptions")
+                    SettingsOptionsMenu(label: "Save folder options", identifier: "saveFolderOptions",
+                                        primaryTitle: "Choose Folder…",
+                                        primary: { Task { await document.chooseFolder(parent: settingsWindow) } },
+                                        secondaryTitle: "Use Downloads", secondaryEnabled: !document.isDefaultFolder,
+                                        secondary: { document.useDownloads() })
+                        .frame(width: 18, height: 22)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
