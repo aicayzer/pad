@@ -23,6 +23,42 @@ final class PadUITests: XCTestCase {
         expectValue("Original text still editable", in: editor)
     }
 
+    func testRenameCommitsOnOutsideClickAndEscapeCancels() {
+        let app = launchPad()
+        defer { app.terminate() }
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        app.typeText("Keep this text")
+        let stem = "Rename-\(UUID().uuidString)"
+        app.typeKey("r", modifierFlags: .command)
+        let name = app.textFields["Name"].firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        app.typeText(stem)
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).click()
+        XCTAssertTrue(app.staticTexts["\(stem).txt"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(name.exists)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText(" still editable")
+        expectValue("Keep this text still editable", in: editor)
+
+        app.typeKey("r", modifierFlags: .command)
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        app.typeText("Cancel this name")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.staticTexts["\(stem).txt"].firstMatch.waitForExistence(timeout: 5))
+
+        app.typeKey("r", modifierFlags: .command)
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        app.typeText("Invalid/name")
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).click()
+        let error = app.staticTexts["documentError"].firstMatch
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["\(stem).txt"].firstMatch.exists)
+        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeText(" after error")
+        expectValue("Keep this text still editable after error", in: editor)
+    }
+
     func testSettingsPreservesScratchAndEditorAcceptsInput() throws {
         let app = launchPad()
         defer { app.terminate() }

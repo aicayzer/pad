@@ -5,6 +5,23 @@ import Testing
 
 @MainActor
 @Suite struct SettingsTests {
+    @Test func errorColorUsesTheSpecifiedLightAndDarkValues() throws {
+        let color = try #require(NSColor(named: "ErrorColor"))
+        for (name, expected) in [(NSAppearance.Name.aqua, [255.0, 59.0, 48.0]),
+                                 (NSAppearance.Name.darkAqua, [255.0, 69.0, 58.0])] {
+            let appearance = try #require(NSAppearance(named: name))
+            var components: [Double] = []
+            appearance.performAsCurrentDrawingAppearance {
+                if let resolved = color.usingColorSpace(.sRGB) {
+                    components = [resolved.redComponent, resolved.greenComponent, resolved.blueComponent]
+                        .map { Double($0) * 255 }
+                }
+            }
+            #expect(components.count == 3)
+            for (actual, target) in zip(components, expected) { #expect(abs(actual - target) < 0.01) }
+        }
+    }
+
     @Test func freshSettingsUsePadDefaults() {
         let suite = "pad-settings-tests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

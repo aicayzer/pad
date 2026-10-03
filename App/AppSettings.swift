@@ -186,7 +186,7 @@ final class AppSettings {
         }
         let applied = NSApp.setActivationPolicy(policy)
         activationPolicyError = applied || NSApp.activationPolicy() == policy
-            ? nil : "Could not update Dock visibility. Try changing the setting again."
+            ? nil : "Couldn’t change whether PadPad appears in the Dock. Try again."
         if !applied { cancelActivationTransition() }
     }
 

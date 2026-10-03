@@ -24,7 +24,6 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
     private let quit: @MainActor () -> Void = { NSApp.terminate(nil) }
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
-    private lazy var errorBanner = PadErrorBanner(owner: self)
     private let pendingTitleInput = OverlayInputResponder()
 
     init(files: PadDocument) {
@@ -42,8 +41,7 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
             guard let self else { return }
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
-        },
-            presentError: { [weak self] in self?.errorBanner.show($0) })
+        })
             .environment(files.appSettings ?? AppSettings())
             .frame(minWidth: 520, minHeight: 320))
         for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
@@ -58,8 +56,7 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
     }
 
     override func close() { files.close() }
-    func finishClosing() { errorBanner.hide(); super.close() }
-    override func orderOut(_ sender: Any?) { errorBanner.hide(); super.orderOut(sender) }
+    func finishClosing() { super.close() }
     func toggleExpanded() { zoom(nil) }
     func restoreDefaultSize(animate: Bool = true) {
         guard !styleMask.contains(.fullScreen), let screen = screen ?? NSScreen.main else { return }
@@ -167,7 +164,6 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
         super.becomeKey()
         files.workspace?.didFocus(files)
         files.refreshIfNeeded()
-        errorBanner.show(files.error)
         files.settingsPresented = false
         guard !files.onboarding.isPresented else {
             files.isActive = false

@@ -103,7 +103,7 @@ struct SettingsView: View {
                 Toggle("Open at login", isOn: Binding(get: { login.enabled }, set: { enabled in Task { await login.setEnabled(enabled) } }))
                     .disabled(login.updating)
                 if login.status == .requiresApproval { Button("Allow in Login Items…") { login.openSystemSettings() } }
-                if let error = login.error { Text(error).foregroundStyle(.red) }
+                if let error = login.error { Text(error).foregroundStyle(Color("ErrorColor")) }
                 Toggle("Keep quick pad on top", isOn: $document.floating)
                 Picker("Open PadPad from", selection: Binding(
                     get: { settings.access },
@@ -118,7 +118,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier("appAccess")
             } header: { Text("PadPad") } footer: {
                 Text("File windows appear in the Dock while they are open.")
-                if let error = settings.activationPolicyError { Text(error).foregroundStyle(.red) }
+                if let error = settings.activationPolicyError { Text(error).foregroundStyle(Color("ErrorColor")) }
                 if !settings.showInDock && !settings.menuBarItem, let shortcut {
                     Text("Open \(Bundle.main.displayName) with \(shortcut.description).")
                 }
@@ -245,7 +245,7 @@ struct SettingsView: View {
                 }
             } header: { Text("Saving") } footer: {
                 Text("Used when saving a new quick-pad file. Opened files keep their name, folder, and format.")
-                if let error = document.error { Text(error).foregroundStyle(.red) }
+                if let error = document.error { Text(error).foregroundStyle(Color("ErrorColor")) }
             }
         }.formStyle(.grouped)
     }
@@ -280,7 +280,7 @@ struct SettingsView: View {
                 Link("License", destination: URL(string: "https://github.com/aicayzer/padpad/blob/main/LICENSE")!)
             } footer: {
                 if let error = workspace.resetError {
-                    Text(error).foregroundStyle(.secondary)
+                    Text(error).foregroundStyle(Color("ErrorColor"))
                 }
                 HStack {
                     Spacer()
@@ -328,7 +328,7 @@ struct SettingsView: View {
             } footer: {
                 VStack(alignment: .trailing, spacing: 8) {
                     if let error = document.editingShortcuts.error {
-                        Text(error).foregroundStyle(.red).font(.caption)
+                        Text(error).foregroundStyle(Color("ErrorColor")).font(.caption)
                     }
                     HStack {
                         Spacer()

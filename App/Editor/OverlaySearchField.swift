@@ -35,6 +35,7 @@ struct OverlaySearchField: NSViewRepresentable {
         field.font = .systemFont(ofSize: fontSize, weight: fontWeight)
         field.selectsTextOnFocus = selectsTextOnFocus
         field.isCurrent = isCurrent
+        field.blur = blur
         if field.stringValue != text { field.stringValue = text }
         field.requestInitialFocus()
     }
@@ -49,6 +50,10 @@ struct OverlaySearchField: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: OverlaySearchField
         init(_ parent: OverlaySearchField) { self.parent = parent }
+
+        func controlTextDidBeginEditing(_ notification: Notification) {
+            (notification.object as? OverlayTextField)?.recordFocus()
+        }
 
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField, parent.isCurrent() else { return }
@@ -72,14 +77,9 @@ struct OverlaySearchField: NSViewRepresentable {
         }
 
         func controlTextDidEndEditing(_ notification: Notification) {
-            guard let field = notification.object as? OverlayTextField else { return }
-            let owner = parent
-            // A clicked result or a replacement overlay gets to finish before handling an outside click.
-            DispatchQueue.main.async { [weak field] in
-                guard let field, field.window?.isKeyWindow == true,
-                      field.currentEditor() == nil, field.hasFocused, owner.isCurrent() else { return }
-                owner.blur?()
-            }
+            guard notification.object is OverlayTextField, parent.isCurrent() else { return }
+            // Commit before the clicked button's action, especially Save, runs.
+            parent.blur?()
         }
     }
 }
@@ -87,6 +87,8 @@ struct OverlaySearchField: NSViewRepresentable {
 final class OverlayTextField: NSTextField {
     var isCurrent: () -> Bool = { false }
     var selectsTextOnFocus = false
+    var blur: (() -> Void)?
+    private var outsideClickMonitor: Any?
     private(set) var hasFocused = false
     private var generation = 0
     private var scheduled = false
@@ -116,6 +118,7 @@ final class OverlayTextField: NSTextField {
             let pending = window.firstResponder as? OverlayInputResponder
             self.hasFocused = window.makeFirstResponder(self)
             if self.hasFocused {
+                self.recordFocus()
                 if self.selectsTextOnFocus { self.selectText(nil) }
                 for event in pending?.takeEvents() ?? [] {
                     guard self.isCurrent(), window.isKeyWindow else { break }
@@ -125,7 +128,32 @@ final class OverlayTextField: NSTextField {
         }
     }
 
+    func recordFocus() {
+        hasFocused = true
+        watchOutsideClicks()
+    }
+
+    private func watchOutsideClicks() {
+        guard outsideClickMonitor == nil else { return }
+        outsideClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self, self.hasFocused, self.isCurrent(), let window = self.window else { return event }
+            let inside = event.window === window && self.bounds.contains(self.convert(event.locationInWindow, from: nil))
+            guard !inside else { return event }
+            // A blank part of the header needn't become a responder to finish renaming.
+            window.makeFirstResponder(nil)
+            if self.isCurrent() { self.blur?() }
+            return event
+        }
+    }
+
+    isolated deinit {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+    }
+
     func cancelFocus() {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        outsideClickMonitor = nil
+        blur = nil
         generation += 1
         scheduled = false
         isCurrent = { false }

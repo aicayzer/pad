@@ -892,7 +892,9 @@ import Testing
         #expect(try String(contentsOf: existing, encoding: .utf8) == "keep")
         for invalid in ["", "   ", ".", "..", "../escape", "a/b", "a\\b", "a:b", "a\n", String(repeating: "x", count: 253)] {
             #expect(!files.rename(to: invalid))
-            #expect(files.error == PadError.invalidName.localizedDescription)
+            let expected: PadError = invalid.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? .emptyName : invalid.utf8.count > 252 ? .nameTooLong : .invalidName
+            #expect(files.error == expected.localizedDescription)
             #expect(files.url == original)
         }
         try Data("external edit".utf8).write(to: original)

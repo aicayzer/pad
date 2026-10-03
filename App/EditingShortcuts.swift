@@ -75,7 +75,7 @@ final class EditingShortcuts {
 
     func validate(_ shortcut: KeyboardShortcuts.Shortcut, for action: EditingAction) -> KeyboardShortcuts.ValidationResult {
         guard shortcut.modifiers.contains(.command), shortcut.toSwiftUI != nil else {
-            return .disallow(reason: "Use a shortcut that includes Command.")
+            return .disallow(reason: "Choose a shortcut that includes Command.")
         }
         // Keep native editing, navigation, and application commands available.
         let nativeCommands: [KeyboardShortcuts.Shortcut] = [
@@ -91,20 +91,20 @@ final class EditingShortcuts {
         ]
         let navigationKeys: Set<KeyboardShortcuts.Key> = [.leftArrow, .rightArrow, .upArrow, .downArrow, .delete, .deleteForward]
         if nativeCommands.contains(shortcut) || shortcut.key.map({ navigationKeys.contains($0) }) == true {
-            return .disallow(reason: "This shortcut is reserved for text editing or an app command.")
+            return .disallow(reason: "This shortcut is reserved for editing or an app command.")
         }
         if globalShortcut() == shortcut {
-            return .disallow(reason: "This shortcut already shows or hides PadPad.")
+            return .disallow(reason: "This shortcut already opens Quick Pad. Choose another shortcut.")
         }
         if let other = EditingAction.allCases.first(where: { $0 != action && shortcuts[$0] == shortcut }) {
-            return .disallow(reason: "This shortcut is already used by \(other.title).")
+            return .disallow(reason: "This shortcut is already assigned to “\(other.title)”.")
         }
         return .allow
     }
 
     func validateGlobal(_ shortcut: KeyboardShortcuts.Shortcut) -> KeyboardShortcuts.ValidationResult {
         if let action = EditingAction.allCases.first(where: { shortcuts[$0] == shortcut }) {
-            return .disallow(reason: "This shortcut is already used by \(action.title).")
+            return .disallow(reason: "This shortcut is already assigned to “\(action.title)”.")
         }
         return .allow
     }
@@ -122,7 +122,7 @@ final class EditingShortcuts {
 
     func restoreDefaults() {
         if let global = globalShortcut(), Self.standardShortcuts.values.contains(global) {
-            error = "Change the global shortcut before restoring these defaults."
+            error = "Change the Quick Pad shortcut before restoring these defaults."
             return
         }
         shortcuts = Self.standardShortcuts

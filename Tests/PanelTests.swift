@@ -102,12 +102,10 @@ struct PanelTests {
         #expect(window.styleMask.contains(.miniaturizable))
         #expect(window.collectionBehavior.contains(.fullScreenPrimary))
         try await settle()
-        let content = try #require(window.contentView)
+        #expect(window is PadFileWindow)
+        #expect(!window.isExcludedFromWindowsMenu)
         for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-            let button = try #require(window.standardWindowButton(kind))
-            let midpoint = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: content)
-            let headerCenter = content.isFlipped ? content.bounds.minY + 19 : content.bounds.maxY - 19
-            #expect(abs(midpoint.y - headerCenter) < 1)
+            #expect(window.standardWindowButton(kind)?.isHidden == true)
         }
         workspace.open(firstURL)
         #expect(workspace.documents.count == 2)
