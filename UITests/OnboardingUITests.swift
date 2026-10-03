@@ -218,7 +218,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(settings.frame.height, 520, "Settings should have room for its complete default layout")
 
         selectTab("General", in: settings)
-        expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
+        expectHittable(settings.popUpButtons["menuBarIcon"].firstMatch)
         let size = settings.frame.size
         XCTAssertGreaterThan(size.height, 0)
         XCTAssertGreaterThanOrEqual(size.height, 520)
@@ -274,7 +274,7 @@ final class OnboardingUITests: XCTestCase {
         attach(settings.screenshot(), name: "Compact About settings with Reset App reachable")
 
         selectTab("General", in: settings)
-        expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
+        expectHittable(settings.popUpButtons["menuBarIcon"].firstMatch)
         expectSize(size, of: settings)
 
         settings.buttons[XCUIIdentifierCloseWindow].click()
