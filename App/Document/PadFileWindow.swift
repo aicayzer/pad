@@ -18,14 +18,14 @@ extension PadDocumentWindow {
     func restoreDefaultSize() { restoreDefaultSize(animate: true) }
 }
 
-/// An ordinary document window. AppKit owns its chrome and toolbar geometry.
+/// An independent file window using the same compact shell as the quick pad.
 final class PadFileWindow: NSWindow, PadDocumentWindow {
     private let files: PadDocument
     private let quit: @MainActor () -> Void = { NSApp.terminate(nil) }
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
     private lazy var errorBanner = PadErrorBanner(owner: self)
-    private let headerMetrics = PadFileHeaderMetrics()
+    private let pendingTitleInput = OverlayInputResponder()
 
     init(files: PadDocument) {
         self.files = files
@@ -37,19 +37,18 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
         titlebarAppearsTransparent = true
         isOpaque = false
         backgroundColor = .clear
-        toolbarStyle = .unified
         collectionBehavior = [.fullScreenPrimary, .fullScreenAllowsTiling]
-        contentView = NSHostingView(rootView: PadView(files: files, fileHeaderMetrics: headerMetrics, prepareTitleFocus: {},
+        contentView = NSHostingView(rootView: PadView(files: files, prepareTitleFocus: { [weak self] in
+            guard let self else { return }
+            pendingTitleInput.discardEvents()
+            makeFirstResponder(pendingTitleInput)
+        },
             presentError: { [weak self] in self?.errorBanner.show($0) })
             .environment(files.appSettings ?? AppSettings())
             .frame(minWidth: 520, minHeight: 320))
-        // Reserve a native unified title-bar row so AppKit lays out its own
-        // traffic lights. All visible document controls belong to PadPad's header.
-        let titlebar = NSToolbar(identifier: "pad-file-titlebar")
-        titlebar.displayMode = .iconOnly
-        titlebar.allowsUserCustomization = false
-        titlebar.insertItem(withItemIdentifier: .flexibleSpace, at: 0)
-        toolbar = titlebar
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            standardWindowButton(kind)?.isHidden = true
+        }
         isExcludedFromWindowsMenu = false
         pendingEditorInput.attach(to: self)
         restoreDefaultSize(animate: false)
@@ -107,6 +106,7 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
     }
 
     func prepareOnboarding() {
+        pendingTitleInput.discardEvents()
         pendingEditorInput.discardEvents()
         makeFirstResponder(nil)
     }
@@ -202,6 +202,7 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
 
     override func resignKey() {
         super.resignKey()
+        pendingTitleInput.discardEvents()
         files.isActive = false
         files.lostFocus()
     }

@@ -48,9 +48,6 @@ struct AppCommands: Commands {
                 .disabled(!canEdit)
             Divider()
             Button("Quick Pad") { workspace.quickPad.showCurrent() }
-            ForEach(workspace.documents, id: \.documentID) { file in
-                Button(file.displayName) { file.showCurrent() }
-            }
         }
         CommandGroup(replacing: .help) {
             Button("Show PadPad Introduction") { Task { await workspace.quickPad.restartOnboarding() } }

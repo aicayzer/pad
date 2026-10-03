@@ -420,7 +420,6 @@ struct PadView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
-    var fileHeaderMetrics: PadFileHeaderMetrics? = nil
     let prepareTitleFocus: () -> Void
     let presentError: (String?) -> Void
     @State private var renaming = false
@@ -473,29 +472,24 @@ struct PadView: View {
     }
 
     private var editorLayout: some View {
-        let headerHeight: CGFloat = files.isQuickPad ? 38 : fileHeaderMetrics?.height ?? 52
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             GeometryReader { geometry in
                 let centerWidth: CGFloat = Self.usesCenteredFormattingToolbar && showingFormatting && files.currentFormat == .md
                     ? (geometry.size.width >= 820 ? 280 : geometry.size.width >= 700 ? 144 : 36) : 0
                 let titleSpace = Self.usesCenteredFormattingToolbar && showingFormatting
                     ? max(40, (geometry.size.width - centerWidth) / 2 - 100)
-                    : max(40, geometry.size.width - (files.isQuickPad ? 216 : 270))
+                    : max(40, geometry.size.width - 216)
                 ZStack {
                     HStack(spacing: 6) {
-                        if files.isQuickPad {
-                            Button { files.close() } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 14, height: 14)
-                                    .frame(width: 22, height: 26)
-                            }
-                            .padding(.trailing, -2)
-                            .accessibilityLabel("Close PadPad")
-                        } else {
-                            Color.clear.frame(width: max(0, (fileHeaderMetrics?.titleInset ?? 84) - 14), height: 26)
+                        Button { files.close() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 14, height: 14)
+                                .frame(width: 22, height: 26)
                         }
+                        .padding(.trailing, -2)
+                        .accessibilityLabel(files.isQuickPad ? "Close PadPad" : "Close file")
                         HStack(spacing: 5) {
                             if renaming {
                                 HStack(spacing: 2) {
@@ -575,10 +569,9 @@ struct PadView: View {
                             .frame(width: centerWidth)
                     }
                 }
-                .frame(width: geometry.size.width, height: headerHeight)
+                .frame(width: geometry.size.width, height: 38)
             }
-            .frame(height: headerHeight)
-            .background(PadWindowControlsAnchor(metrics: fileHeaderMetrics))
+            .frame(height: 38)
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(.secondary)
