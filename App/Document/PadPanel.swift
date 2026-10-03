@@ -28,9 +28,9 @@ final class PadPanel: NSPanel {
     private var previousFrame: NSRect?
     private var restoreAfterFullScreen = false
     private static let maximumWidth: CGFloat = 1_200
-    private static let centerSnapDistance: CGFloat = 20
     private var trackingWindowMove = false
-    private var pendingCenterSnap: DispatchWorkItem?
+    private var snapTrackingTimer: Timer?
+    private lazy var snapGuide = PadSnapGuide()
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
@@ -111,49 +111,64 @@ final class PadPanel: NSPanel {
     @objc private func windowResized() { errorBanner.show(files.error) }
 
     override func orderOut(_ sender: Any?) {
+        endSnapTracking(commit: false)
         errorBanner.hide()
         super.orderOut(sender)
     }
 
     @objc private func windowWillMove() {
-        trackingWindowMove = NSEvent.pressedMouseButtons & 1 != 0
+        guard files.isQuickPad, !styleMask.contains(.fullScreen),
+              files.appSettings?.snapQuickPadToCenter != false,
+              NSEvent.pressedMouseButtons & 1 != 0 else { return }
+        trackingWindowMove = true
+        updateSnapGuide()
+        guard snapTrackingTimer == nil else { return }
+        // Native window dragging uses the event-tracking run loop. Keep preview
+        // and release detection active there as well as after dragging returns.
+        let timer = Timer(timeInterval: 1.0 / 60, target: self,
+                          selector: #selector(trackSnapDrag), userInfo: nil, repeats: true)
+        snapTrackingTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        RunLoop.main.add(timer, forMode: .eventTracking)
     }
 
     @objc private func windowMoved() {
         errorBanner.position()
-        guard files.isQuickPad, files.appSettings?.snapQuickPadToCenter != false, trackingWindowMove else { return }
-        scheduleCenterSnap()
+        if trackingWindowMove { updateSnapGuide() }
     }
 
-    private func scheduleCenterSnap() {
-        pendingCenterSnap?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            // Native dragging runs its own event loop. Wait until the mouse is
-            // released, so a pause during a drag never pulls the window away.
-            if NSEvent.pressedMouseButtons & 1 != 0 {
-                self.scheduleCenterSnap()
-                return
-            }
-            self.pendingCenterSnap = nil
-            self.trackingWindowMove = false
-            self.snapNearCenter()
+    @objc private func trackSnapDrag() {
+        guard isVisible, files.appSettings?.snapQuickPadToCenter != false else {
+            endSnapTracking(commit: false)
+            return
         }
-        pendingCenterSnap = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+        if NSEvent.pressedMouseButtons & 1 == 0 {
+            endSnapTracking(commit: true)
+        } else {
+            updateSnapGuide()
+        }
     }
 
-    private func snapNearCenter() {
-        guard isVisible, let screen else { return }
-        let visible = screen.visibleFrame
-        var target = frame
-        if abs(frame.midX - visible.midX) <= Self.centerSnapDistance {
-            target.origin.x = visible.midX - frame.width / 2
-        }
-        if abs(frame.midY - visible.midY) <= Self.centerSnapDistance {
-            target.origin.y = visible.midY - frame.height / 2
-        }
-        guard target.origin != frame.origin else { return }
+    private func snapDestination() -> NSRect? {
+        // Follow the pointer's display while crossing between screens.
+        guard let display = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
+                ?? screen ?? NSScreen.main else { return nil }
+        return PadQuickPadPlacement.frame(size: frame.size, in: display.visibleFrame)
+    }
+
+    private func updateSnapGuide() {
+        guard let target = snapDestination() else { return }
+        snapGuide.show(target: target, near: PadQuickPadPlacement.isNear(frame, target: target), below: self)
+    }
+
+    private func endSnapTracking(commit: Bool) {
+        let wasTracking = trackingWindowMove
+        trackingWindowMove = false
+        snapTrackingTimer?.invalidate()
+        snapTrackingTimer = nil
+        snapGuide.hide()
+        guard commit, wasTracking, let target = snapDestination(),
+              PadQuickPadPlacement.isNear(frame, target: target) else { return }
         setFrameOrigin(target.origin)
     }
 
@@ -316,9 +331,11 @@ final class PadPanel: NSPanel {
         let size = NSSize(width: min(width, visible.width), height: min(height, visible.height))
         previousFrame = nil
         setFrame(NSRect(origin: frame.origin, size: size), display: true, animate: animate)
-        // Preserve AppKit's optical centering, which places a writing window slightly
-        // above the geometric midpoint. It also chooses the window's current display.
-        center()
+        if files.isQuickPad {
+            setFrameOrigin(PadQuickPadPlacement.frame(size: size, in: screen.visibleFrame).origin)
+        } else {
+            center()
+        }
         setFrame(constrainFrameRect(frame, to: screen), display: true)
     }
 

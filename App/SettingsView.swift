@@ -139,7 +139,7 @@ struct SettingsView: View {
                            canUseCurrent: workspace.canUseFileSize,
                            useCurrent: { workspace.useCurrentFileSize() },
                            restore: { settings.restoreFileWindowSize() })
-                Toggle("Snap quick pad to center", isOn: $settings.snapQuickPadToCenter)
+                Toggle("Snap quick pad to default position", isOn: $settings.snapQuickPadToCenter)
             } header: { Text("Window size") } footer: {
                 Text("Width × height, in points.")
             }
