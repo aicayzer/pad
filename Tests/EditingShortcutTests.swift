@@ -39,7 +39,7 @@ import Testing
         let acceptedPaste = shortcuts.set(KeyboardShortcuts.Shortcut(.v, modifiers: [.command, .shift]), for: .newFile)
         let acceptedTyping = shortcuts.set(KeyboardShortcuts.Shortcut(.b), for: .newFile)
         let acceptedClose = shortcuts.set(KeyboardShortcuts.Shortcut(.w, modifiers: .command), for: .newFile)
-        let acceptedCopy = shortcuts.set(KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .shift]), for: .save)
+        let acceptedCopy = shortcuts.set(KeyboardShortcuts.Shortcut(.c, modifiers: .command), for: .save)
         #expect(acceptedCopy == false)
         #expect(acceptedPaste == false)
         #expect(acceptedTyping == false)
@@ -64,19 +64,60 @@ import Testing
         #expect(shortcuts.error != nil)
     }
 
-    @Test func existingCopyShortcutConflictsRemainAssigned() throws {
+    @Test func newActionsGainDefaultsWithoutReplacingExistingBindings() throws {
         let name = "pad-copy-conflict-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
-        let copy = KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .shift])
+        let copy = EditingAction.copyAllContents.defaultShortcut
         let original: [EditingAction: KeyboardShortcuts.Shortcut] = [.save: copy]
         defaults.set(try JSONEncoder().encode(original), forKey: "pad.editingShortcuts")
         let shortcuts = EditingShortcuts(defaults: defaults, globalShortcut: { nil })
         #expect(shortcuts.shortcut(for: .save) == copy)
-        #expect(!shortcuts.copyAllShortcutAvailable)
+        #expect(shortcuts.shortcut(for: .open) == nil)
+        #expect(shortcuts.shortcut(for: .copyAllContents) == nil)
+        #expect(shortcuts.shortcut(for: .restoreDefaultSize) == EditingAction.restoreDefaultSize.defaultShortcut)
         #expect(shortcuts.set(nil, for: .save))
-        #expect(shortcuts.copyAllShortcutAvailable)
-        #expect(!EditingShortcuts(defaults: defaults, globalShortcut: { copy }).copyAllShortcutAvailable)
+        #expect(shortcuts.set(copy, for: .copyAllContents))
+        #expect(shortcuts.set(nil, for: .restoreDefaultSize))
+        let reloaded = EditingShortcuts(defaults: defaults, globalShortcut: { nil })
+        #expect(reloaded.shortcut(for: .restoreDefaultSize) == nil)
+        #expect(reloaded.shortcut(for: .copyAllContents) == copy)
+        #expect(reloaded.shortcut(for: .open) == nil)
+    }
+
+    @Test func newlyAddedDefaultsRespectTheGlobalShortcut() throws {
+        let name = "pad-new-global-conflict-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let global = EditingAction.restoreDefaultSize.defaultShortcut
+        let original: [EditingAction: KeyboardShortcuts.Shortcut] = [.save: EditingAction.save.defaultShortcut]
+        defaults.set(try JSONEncoder().encode(original), forKey: "pad.editingShortcuts")
+        let shortcuts = EditingShortcuts(defaults: defaults, globalShortcut: { global })
+        #expect(shortcuts.shortcut(for: .restoreDefaultSize) == nil)
+        #expect(shortcuts.shortcut(for: .copyAllContents) == EditingAction.copyAllContents.defaultShortcut)
+        #expect(!shortcuts.set(global, for: .restoreDefaultSize))
+        #expect(shortcuts.shortcut(for: .save) == EditingAction.save.defaultShortcut)
+    }
+
+    @Test func newShortcutsAreCustomizableAndGlobalValidationTracksAssignments() throws {
+        let name = "pad-new-shortcuts-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let shortcuts = EditingShortcuts(defaults: defaults, globalShortcut: { nil })
+        let copy = EditingAction.copyAllContents.defaultShortcut
+        let restore = EditingAction.restoreDefaultSize.defaultShortcut
+        #expect(shortcuts.validate(copy, for: .copyAllContents) == .allow)
+        #expect(shortcuts.validate(restore, for: .restoreDefaultSize) == .allow)
+        #expect(shortcuts.validateGlobal(copy) != .allow)
+        #expect(shortcuts.set(.init(.k, modifiers: [.command, .shift]), for: .copyAllContents))
+        #expect(shortcuts.validateGlobal(copy) == .allow)
+        #expect(shortcuts.set(copy, for: .save))
+        #expect(shortcuts.validateGlobal(copy) != .allow)
+        #expect(shortcuts.set(.init(.j, modifiers: [.command, .shift]), for: .restoreDefaultSize))
+        #expect(shortcuts.validateGlobal(restore) == .allow)
+        let reloaded = EditingShortcuts(defaults: defaults, globalShortcut: { nil })
+        #expect(reloaded.shortcut(for: .restoreDefaultSize) == .init(.j, modifiers: [.command, .shift]))
+        #expect(reloaded.shortcut(for: .copyAllContents) == .init(.k, modifiers: [.command, .shift]))
     }
 
     @Test func eventRoutingUsesCustomBindingAndIgnoresOldBinding() throws {
@@ -94,5 +135,7 @@ import Testing
         #expect(shortcuts.action(for: try event(.n, "n", .command)) == nil)
         #expect(shortcuts.action(for: try event(.b, "b", [])) == nil)
         #expect(shortcuts.action(for: try event(.c, "c", .command)) == nil)
+        #expect(shortcuts.action(for: try event(.c, "c", [.command, .shift])) == .copyAllContents)
+        #expect(shortcuts.action(for: try event(.zero, "0", .command)) == .restoreDefaultSize)
     }
 }

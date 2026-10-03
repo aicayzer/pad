@@ -104,7 +104,8 @@ final class PadUITests: XCTestCase {
         let settings = app.windows["com_apple_SwiftUI_Settings_window"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5), app.debugDescription)
         selectTab("Files", in: settings)
-        settings.buttons["Choose…"].click()
+        settings.buttons["saveFolderOptions"].click()
+        app.menuItems["Choose Folder…"].click()
         let sheet = settings.sheets.firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 5), app.debugDescription)
         let cancel = sheet.buttons["CancelButton"].firstMatch
@@ -431,7 +432,7 @@ final class PadUITests: XCTestCase {
         app.activate()
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         selectTab("Files", in: settings)
-        XCTAssertTrue(settings.buttons["Choose…"].firstMatch.isEnabled)
+        XCTAssertTrue(settings.buttons["saveFolderOptions"].firstMatch.isEnabled)
         attach(settings.screenshot(), name: "Settings active again after Finder")
     }
 
@@ -617,6 +618,30 @@ final class PadUITests: XCTestCase {
         selectTab("General", in: settings)
         settings.popUpButtons["appAccess"].click()
         app.menuItems["Dock and menu bar"].click()
+    }
+
+    func testOptionShiftBReopensHiddenMarkdownFromFinder() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-pad.onboardingCompleted", "YES", "-pad.format", "md",
+                               "-pad.saveAutomatically", "NO", "-pad.floating", "YES",
+                               "-showInDock", "YES", "-menuBarItem", "NO",
+                               "-KeyboardShortcuts_pad", #""{\"carbonKeyCode\":11,\"carbonModifiers\":2560}""#]
+        app.launch()
+        defer { app.terminate() }
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        let close = app.buttons["Close PadPad"].firstMatch
+        XCTAssertFalse(close.exists)
+        finder.activate()
+        finder.typeKey("b", modifierFlags: [.option, .shift])
+        XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.menuButtons["formattingMenu"].firstMatch.waitForExistence(timeout: 10))
+        app.typeText("Retained Markdown")
+        finder.activate()
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: close)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed)
+        finder.typeKey("b", modifierFlags: [.option, .shift])
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "The shortcut must show hidden Markdown before snapshotting")
     }
 
     private func launchPad(floating: Bool = false) -> XCUIApplication {

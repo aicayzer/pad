@@ -208,27 +208,30 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(element("onboardingIntro", in: app).exists)
     }
 
-    func testCompactSettingsKeepTheSameFrameAndBottomControlsReachable() {
+    func testSettingsKeepTheSameFrameAndBottomControlsReachable() {
         let app = launchPad(completed: true, format: "txt", accent: "custom")
         defer { app.terminate() }
         app.typeKey("n", modifierFlags: .command)
         expectHittable(app.textViews.firstMatch)
         let settings = openSettings(app)
         attach(settings.screenshot(), name: "Settings on first opening before any tab selection")
-        XCTAssertLessThan(settings.frame.height, 580, "Restored Settings must be compact before switching tabs")
+        XCTAssertGreaterThanOrEqual(settings.frame.height, 520, "Settings should have room for its complete default layout")
 
         selectTab("General", in: settings)
-        expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
+        expectHittable(settings.popUpButtons["menuBarIcon"].firstMatch)
         let size = settings.frame.size
         XCTAssertGreaterThan(size.height, 0)
-        XCTAssertLessThan(size.height, 580, "Settings should be shorter than the previous 580-point content area")
+        XCTAssertGreaterThanOrEqual(size.height, 520)
         attach(settings.screenshot(), name: "Compact General settings with the bottom icon control visible")
 
         selectTab("Editor", in: settings)
-        expectHittable(settings.buttons["useCurrentQuickPadSize"].firstMatch)
-        XCTAssertTrue(settings.buttons["useCurrentFileSize"].exists)
-        XCTAssertFalse(settings.buttons["useCurrentFileSize"].isEnabled,
-                       "Use Current File Size requires an open file window")
+        expectHittable(element("quickPadSizeOptions", in: settings))
+        expectHittable(element("fileWindowSizeOptions", in: settings))
+        element("fileWindowSizeOptions", in: settings).click()
+        XCTAssertFalse(app.menuItems["Use Current Size"].firstMatch.isEnabled,
+                       "Use Current Size requires an open file window")
+        XCTAssertTrue(app.menuItems["Restore Default"].firstMatch.isEnabled)
+        app.typeKey(.escape, modifierFlags: [])
         let readingWidth = element("limitTextWidth", in: settings)
         for _ in 0..<3 where !readingWidth.isHittable {
             settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
@@ -239,9 +242,6 @@ final class OnboardingUITests: XCTestCase {
 
         selectTab("Files", in: settings)
         let filename = element("File name", in: settings)
-        for _ in 0..<3 where !filename.isHittable {
-            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
-        }
         expectHittable(filename)
         expectHittable(element("Insert filename variable", in: settings))
         expectSize(size, of: settings)
@@ -274,7 +274,7 @@ final class OnboardingUITests: XCTestCase {
         attach(settings.screenshot(), name: "Compact About settings with Reset App reachable")
 
         selectTab("General", in: settings)
-        expectHittable(settings.popUpButtons["Menu bar icon"].firstMatch)
+        expectHittable(settings.popUpButtons["menuBarIcon"].firstMatch)
         expectSize(size, of: settings)
 
         settings.buttons[XCUIIdentifierCloseWindow].click()

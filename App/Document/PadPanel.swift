@@ -63,6 +63,7 @@ final class PadPanel: NSPanel {
         isFloatingPanel = false
         becomesKeyOnlyIfNeeded = false
         if files.isQuickPad {
+            collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
             for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
                 standardWindowButton(button)?.isHidden = true
             }
@@ -269,17 +270,9 @@ final class PadPanel: NSPanel {
             case .open: Task { await files.openPicker() }
             case .save: files.save()
             case .saveAs: Task { await files.saveAs() }
+            case .restoreDefaultSize: restoreDefaultSize()
+            case .copyAllContents: Task { await files.copyAllContents() }
             }
-            return true
-        }
-        if files.editingShortcuts.copyAllShortcutAvailable,
-           modifiers == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "c" {
-            if !files.onboarding.isPresented { Task { await files.copyAllContents() } }
-            return true
-        }
-        if files.editingShortcuts.restoreSizeShortcutAvailable, modifiers == .command,
-           event.charactersIgnoringModifiers == "0" {
-            restoreDefaultSize()
             return true
         }
         if modifiers == .command {
@@ -322,8 +315,11 @@ final class PadPanel: NSPanel {
         let visible = screen.visibleFrame.insetBy(dx: 12, dy: 12)
         let size = NSSize(width: min(width, visible.width), height: min(height, visible.height))
         previousFrame = nil
-        setFrame(NSRect(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2,
-                        width: size.width, height: size.height), display: true, animate: animate)
+        setFrame(NSRect(origin: frame.origin, size: size), display: true, animate: animate)
+        // Preserve AppKit's optical centering, which places a writing window slightly
+        // above the geometric midpoint. It also chooses the window's current display.
+        center()
+        setFrame(constrainFrameRect(frame, to: screen), display: true)
     }
 
     @objc private func exitedFullScreen() {
@@ -510,6 +506,10 @@ private struct PadView: View {
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
+                            actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
+                                files.share(from: shareAnchor.view)
+                            }
+                            .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
                             if files.currentFormat == .md, let editor = files.markdownEditor {
                                 Group {
                                     if Self.usesCenteredFormattingToolbar {
@@ -544,24 +544,7 @@ private struct PadView: View {
                                     }
                                 }
                             }
-                            Menu {
-                                if files.url != nil {
-                                    Button("Reveal in Finder") { files.revealInFinder() }
-                                }
-                                Button("Restore Default Size") { files.restoreDefaultSize() }
-                            } label: {
-                                Image(systemName: "ellipsis").frame(width: 16)
-                            }
-                            .menuStyle(.button)
-                            .menuIndicator(.hidden)
-                            .buttonStyle(PadToolbarButtonStyle())
-                            .accessibilityLabel("More Options")
-                            .accessibilityIdentifier("moreOptionsMenu")
-                            .help("More Options")
-                            actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
-                                files.share(from: shareAnchor.view)
-                            }
-                            .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
+
 
                         }
                         .fixedSize()
@@ -580,6 +563,7 @@ private struct PadView: View {
                 .frame(width: geometry.size.width, height: 38)
             }
             .frame(height: 38)
+            .background(PadWindowControlsAnchor())
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(.secondary)

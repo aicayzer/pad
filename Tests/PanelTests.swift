@@ -35,6 +35,32 @@ struct PanelTests {
         #expect(panel.contentMinSize.width == 520)
     }
 
+    @Test func reopeningHiddenMarkdownDoesNotWaitForAnOffscreenSnapshot() async throws {
+        let suite = "pad-reopen-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.set(true, forKey: "pad.onboardingCompleted")
+        defaults.set("txt", forKey: "pad.format")
+        defaults.set(false, forKey: "pad.saveAutomatically")
+        let document = PadDocument(defaults: defaults)
+        defer {
+            document.editorSnapshot = nil
+            document.text = document.savedText
+            document.close()
+            defaults.removePersistentDomain(forName: suite)
+        }
+        document.newFile()
+        document.text = "Retain this draft"
+        document.close()
+        document.format = .md
+        var snapshots = 0
+        document.editorSnapshot = { snapshots += 1; return "Retain this draft" }
+        document.handleGlobalShortcut()
+        #expect(document.isVisible)
+        #expect(snapshots == 0)
+        #expect(document.text == "Retain this draft")
+        #expect(document.nativeWindow?.collectionBehavior.contains(.moveToActiveSpace) == true)
+    }
+
     @Test func independentFileWindowsSaveRejectCollisionsAndResolveCloseDecisions() async throws {
         let suite = "pad-file-smoke-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -75,6 +101,14 @@ struct PanelTests {
         let window = try #require(first.nativeWindow)
         #expect(window.styleMask.contains(.miniaturizable))
         #expect(window.collectionBehavior.contains(.fullScreenPrimary))
+        try await settle()
+        let content = try #require(window.contentView)
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            let button = try #require(window.standardWindowButton(kind))
+            let midpoint = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: content)
+            let headerCenter = content.isFlipped ? content.bounds.minY + 19 : content.bounds.maxY - 19
+            #expect(abs(midpoint.y - headerCenter) < 1)
+        }
         workspace.open(firstURL)
         #expect(workspace.documents.count == 2)
         // The hosted test app cannot reliably take foreground activation on Atlas.
