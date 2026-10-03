@@ -1,46 +1,80 @@
 import AppKit
+import Observation
 import SwiftUI
 
-/// Align native window controls with the actual custom header, without replacing them.
+/// The native buttons stay where AppKit puts them. The custom header follows.
+@MainActor
+@Observable
+final class PadFileHeaderMetrics {
+    var height: CGFloat = 52
+    var titleInset: CGFloat = 84
+}
+
 struct PadWindowControlsAnchor: NSViewRepresentable {
-    func makeNSView(context: Context) -> HeaderAnchor { HeaderAnchor() }
-    func updateNSView(_ view: HeaderAnchor, context: Context) { view.scheduleAlignment() }
+    var metrics: PadFileHeaderMetrics?
+
+    func makeNSView(context: Context) -> HeaderAnchor {
+        let view = HeaderAnchor()
+        view.metrics = metrics
+        return view
+    }
+
+    func updateNSView(_ view: HeaderAnchor, context: Context) {
+        view.metrics = metrics
+        view.scheduleMeasurement()
+    }
 
     final class HeaderAnchor: NSView {
-        private var alignmentScheduled = false
+        weak var metrics: PadFileHeaderMetrics?
+        private var measurementScheduled = false
+        private var observers: [NSObjectProtocol] = []
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            scheduleAlignment()
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers.removeAll()
+            if let window, metrics != nil {
+                for name in [NSWindow.didResizeNotification, NSWindow.didUpdateNotification,
+                             NSWindow.didBecomeKeyNotification, NSWindow.didExitFullScreenNotification] {
+                    observers.append(NotificationCenter.default.addObserver(forName: name, object: window,
+                        queue: .main) { [weak self] _ in
+                            MainActor.assumeIsolated { self?.scheduleMeasurement() }
+                        })
+                }
+            }
+            scheduleMeasurement()
         }
 
         override func layout() {
             super.layout()
-            scheduleAlignment()
+            scheduleMeasurement()
         }
 
-        func scheduleAlignment() {
-            guard !alignmentScheduled else { return }
-            alignmentScheduled = true
+        func scheduleMeasurement() {
+            guard metrics != nil, !measurementScheduled else { return }
+            measurementScheduled = true
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.alignmentScheduled = false
-                self.alignControls()
+                self.measurementScheduled = false
+                self.measureHeader()
             }
         }
 
-        private func alignControls() {
-            guard let window, bounds.height > 0 else { return }
-            let midpoint = NSPoint(x: bounds.midX, y: bounds.midY)
-            for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-                guard let button = window.standardWindowButton(kind), !button.isHidden,
-                      let parent = button.superview else { continue }
-                let center = parent.convert(midpoint, from: self)
-                let y = center.y - button.frame.height / 2
-                if abs(button.frame.origin.y - y) > 0.25 {
-                    button.setFrameOrigin(NSPoint(x: button.frame.origin.x, y: y))
-                }
-            }
+        private func measureHeader() {
+            guard let window, let content = window.contentView, let metrics,
+                  let close = window.standardWindowButton(.closeButton), !close.isHidden,
+                  let zoom = window.standardWindowButton(.zoomButton) else { return }
+            let closeRect = content.convert(close.bounds, from: close)
+            let zoomRect = content.convert(zoom.bounds, from: zoom)
+            let centerFromTop = content.isFlipped ? closeRect.midY - content.bounds.minY
+                : content.bounds.maxY - closeRect.midY
+            guard centerFromTop > 0, centerFromTop < 80 else { return }
+            let height = centerFromTop * 2
+            let inset = zoomRect.maxX - content.bounds.minX + 14
+            if abs(metrics.height - height) > 0.5 { metrics.height = height }
+            if abs(metrics.titleInset - inset) > 0.5 { metrics.titleInset = inset }
         }
+
+        isolated deinit { observers.forEach(NotificationCenter.default.removeObserver) }
     }
 }

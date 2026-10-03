@@ -420,6 +420,7 @@ struct PadView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
+    var fileHeaderMetrics: PadFileHeaderMetrics? = nil
     let prepareTitleFocus: () -> Void
     let presentError: (String?) -> Void
     @State private var renaming = false
@@ -466,19 +467,14 @@ struct PadView: View {
             shortcut = KeyboardShortcuts.getShortcut(for: .pad)
         }
         .onChange(of: files.renameRequest) { _, _ in beginRename() }
-        .alert("Rename", isPresented: Binding(get: { !files.isQuickPad && renaming }, set: { renaming = $0 })) {
-            TextField("Name", text: $titleDraft)
-            Button("Cancel", role: .cancel) { finishRename() }
-            Button("Rename") { commitRename() }
-        }
         .onChange(of: files.onboarding.isPresented) { _, presented in
             if presented { editing = false; renaming = false; showingFormatting = false }
         }
     }
 
     private var editorLayout: some View {
-        VStack(spacing: 0) {
-            if files.isQuickPad {
+        let headerHeight: CGFloat = files.isQuickPad ? 38 : fileHeaderMetrics?.height ?? 52
+        return VStack(spacing: 0) {
             GeometryReader { geometry in
                 let centerWidth: CGFloat = Self.usesCenteredFormattingToolbar && showingFormatting && files.currentFormat == .md
                     ? (geometry.size.width >= 820 ? 280 : geometry.size.width >= 700 ? 144 : 36) : 0
@@ -498,7 +494,7 @@ struct PadView: View {
                             .padding(.trailing, -2)
                             .accessibilityLabel("Close PadPad")
                         } else {
-                            Color.clear.frame(width: 70, height: 26)
+                            Color.clear.frame(width: max(0, (fileHeaderMetrics?.titleInset ?? 84) - 14), height: 26)
                         }
                         HStack(spacing: 5) {
                             if renaming {
@@ -579,10 +575,10 @@ struct PadView: View {
                             .frame(width: centerWidth)
                     }
                 }
-                .frame(width: geometry.size.width, height: 38)
+                .frame(width: geometry.size.width, height: headerHeight)
             }
-            .frame(height: 38)
-            .background(PadWindowControlsAnchor())
+            .frame(height: headerHeight)
+            .background(PadWindowControlsAnchor(metrics: fileHeaderMetrics))
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(.secondary)
@@ -594,12 +590,10 @@ struct PadView: View {
                     .simultaneousGesture(WindowDragGesture())
             }
 
-            }
             ZStack(alignment: .bottom) {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
                         PadMarkdownEditorView(editor: editor)
-                            .modifier(PadFileLinkPresenter(editor: editor, enabled: !files.isQuickPad))
                             .onChange(of: settings.readingWidth, initial: true) {
                                 editor.setReadingWidth(readingColumnWidth)
                             }
@@ -645,19 +639,15 @@ struct PadView: View {
                 .padding(.bottom, 8)
             }
             .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: files.isQuickPad ? 15 : 0))
-            .padding([.horizontal, .bottom], files.isQuickPad ? 7 : 0)
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .padding([.horizontal, .bottom], 7)
         }
     }
 
     private var editorContent: some View {
-        Group {
-            if files.isQuickPad {
-                editorLayout.glassEffect(.regular, in: .rect).ignoresSafeArea()
-            } else {
-                editorLayout
-            }
-        }
+        editorLayout
+        .glassEffect(.regular, in: .rect)
+        .ignoresSafeArea()
         .tint(settings.accentColor)
         .disabled(files.isBusy || files.workspace?.isTransitioning == true)
         .defaultFocus($editing, true)
@@ -781,14 +771,5 @@ private struct EditorFocusMount: NSViewRepresentable {
         }
 
         func requestFocus() { (window as? any PadDocumentWindow)?.requestEditorFocus() }
-    }
-}
-
-private struct PadFileLinkPresenter: ViewModifier {
-    let editor: PadMarkdownEditorController
-    let enabled: Bool
-    @ViewBuilder func body(content: Content) -> some View {
-        if enabled { content.modifier(PadMarkdownLinkPresenter(editor: editor)) }
-        else { content }
     }
 }

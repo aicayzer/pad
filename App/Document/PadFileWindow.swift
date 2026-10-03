@@ -25,26 +25,31 @@ final class PadFileWindow: NSWindow, PadDocumentWindow {
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
     private lazy var errorBanner = PadErrorBanner(owner: self)
-    private var fileToolbar: PadFileToolbar?
+    private let headerMetrics = PadFileHeaderMetrics()
 
     init(files: PadDocument) {
         self.files = files
         super.init(contentRect: NSRect(x: 0, y: 0, width: 800, height: 860),
-                   styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                   styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                    backing: .buffered, defer: false)
         isReleasedWhenClosed = false
-        titleVisibility = .visible
-        titlebarAppearsTransparent = false
-        backgroundColor = .windowBackgroundColor
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        isOpaque = false
+        backgroundColor = .clear
         toolbarStyle = .unified
         collectionBehavior = [.fullScreenPrimary, .fullScreenAllowsTiling]
-        contentView = NSHostingView(rootView: PadView(files: files, prepareTitleFocus: {},
+        contentView = NSHostingView(rootView: PadView(files: files, fileHeaderMetrics: headerMetrics, prepareTitleFocus: {},
             presentError: { [weak self] in self?.errorBanner.show($0) })
             .environment(files.appSettings ?? AppSettings())
             .frame(minWidth: 520, minHeight: 320))
-        let fileToolbar = PadFileToolbar(files: files)
-        self.fileToolbar = fileToolbar
-        toolbar = fileToolbar.toolbar
+        // Reserve a native unified title-bar row so AppKit lays out its own
+        // traffic lights. All visible document controls belong to PadPad's header.
+        let titlebar = NSToolbar(identifier: "pad-file-titlebar")
+        titlebar.displayMode = .iconOnly
+        titlebar.allowsUserCustomization = false
+        titlebar.insertItem(withItemIdentifier: .flexibleSpace, at: 0)
+        toolbar = titlebar
         isExcludedFromWindowsMenu = false
         pendingEditorInput.attach(to: self)
         restoreDefaultSize(animate: false)
