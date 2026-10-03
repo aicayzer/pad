@@ -1,11 +1,11 @@
 import AppKit
 
 enum PadQuickPadPlacement {
-    /// Center the window horizontally and one-third down the usable display.
+    /// Center horizontally, one-third down the usable display plus one header height.
     /// Tall windows stay within its bounds rather than covering the menu bar.
     static func frame(size: NSSize, in visible: NSRect) -> NSRect {
         let x = visible.midX - size.width / 2
-        let preferredY = visible.maxY - visible.height / 3 - size.height / 2
+        let preferredY = visible.maxY - visible.height / 3 - size.height / 2 - 38
         let y = max(visible.minY, min(preferredY, visible.maxY - size.height))
         return NSRect(x: x, y: y, width: size.width, height: size.height)
     }
@@ -54,7 +54,7 @@ final class PadSnapGuide {
             path.lineCapStyle = .round
             path.setLineDash([1.5, 5], count: 2, phase: 0)
             if isNear {
-                NSColor.secondaryLabelColor.withAlphaComponent(0.12).setFill()
+                NSColor.secondaryLabelColor.withAlphaComponent(0.07).setFill()
                 path.fill()
             }
             NSColor.secondaryLabelColor.withAlphaComponent(0.65).setStroke()

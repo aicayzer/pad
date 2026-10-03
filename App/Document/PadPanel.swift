@@ -523,10 +523,6 @@ private struct PadView: View {
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
-                            actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
-                                files.share(from: shareAnchor.view)
-                            }
-                            .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
                             if files.currentFormat == .md, let editor = files.markdownEditor {
                                 Group {
                                     if Self.usesCenteredFormattingToolbar {
@@ -561,8 +557,10 @@ private struct PadView: View {
                                     }
                                 }
                             }
-
-
+                            actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
+                                files.share(from: shareAnchor.view)
+                            }
+                            .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
                         }
                         .fixedSize()
                         Button("Save") { files.save() }
