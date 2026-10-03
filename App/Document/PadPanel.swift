@@ -31,6 +31,7 @@ final class PadPanel: NSPanel {
     private var trackingWindowMove = false
     private var snapTrackingTimer: Timer?
     private lazy var snapGuide = PadSnapGuide()
+    private var fileToolbar: PadFileToolbar?
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
@@ -49,7 +50,7 @@ final class PadPanel: NSPanel {
         let height = files.isQuickPad ? settings?.quickPadHeight ?? 480 : settings?.fileWindowHeight ?? 860
         let mask: NSWindow.StyleMask = files.isQuickPad
             ? [.titled, .resizable, .fullSizeContentView, .nonactivatingPanel]
-            : [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            : [.titled, .closable, .miniaturizable, .resizable]
         super.init(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
                    styleMask: mask,
                    backing: .buffered, defer: false)
@@ -69,8 +70,6 @@ final class PadPanel: NSPanel {
             }
         } else {
             collectionBehavior = [.fullScreenPrimary, .fullScreenAllowsTiling]
-            // The Window command menu lists these document controllers explicitly.
-            isExcludedFromWindowsMenu = true
         }
         // AppKit draws outside the window; a SwiftUI shadow gets clipped at the hosting bounds.
         hasShadow = true
@@ -86,6 +85,14 @@ final class PadPanel: NSPanel {
             .frame(minWidth: 520, maxWidth: files.isQuickPad ? Self.maximumWidth : nil, minHeight: 320))
         maxSize = NSSize(width: files.isQuickPad ? Self.maximumWidth : CGFloat.greatestFiniteMagnitude,
                          height: CGFloat.greatestFiniteMagnitude)
+        if !files.isQuickPad {
+            titleVisibility = .visible
+            toolbarStyle = .unified
+            let fileToolbar = PadFileToolbar(files: files)
+            self.fileToolbar = fileToolbar
+            toolbar = fileToolbar.toolbar
+            isExcludedFromWindowsMenu = false
+        }
         pendingEditorInput.attach(to: self)
         pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
@@ -475,6 +482,7 @@ private struct PadView: View {
 
     private var editorContent: some View {
         VStack(spacing: 0) {
+            if files.isQuickPad {
             GeometryReader { geometry in
                 let centerWidth: CGFloat = Self.usesCenteredFormattingToolbar && showingFormatting && files.currentFormat == .md
                     ? (geometry.size.width >= 820 ? 280 : geometry.size.width >= 700 ? 144 : 36) : 0
@@ -590,6 +598,7 @@ private struct PadView: View {
                     .simultaneousGesture(WindowDragGesture())
             }
 
+            }
             ZStack(alignment: .bottom) {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
