@@ -41,7 +41,7 @@ import Testing
         #expect(document.currentFormat == .md)
         #expect(document.text == "Keep this")
         #expect(document.documentID == id)
-        #expect(document.error == "Couldn’t read your text. Your document is still open. Try again.")
+        #expect(document.error == "Couldn’t read your text. Try again.")
         #expect(!document.isBusy)
     }
 

@@ -14,10 +14,10 @@ enum PadMarkdownEditorError: LocalizedError {
         switch self {
         case .composing: "Finish typing before saving or closing."
         case .notReady: "The editor is still loading. Try again in a moment."
-        case .documentChanged: "Your text changed while it was being read. Try again."
-        case .invalidResponse: "Couldn’t read your text. Your document is still open."
-        case .unavailable: "The editor is unavailable. Your document is still open."
-        case .script: "The editor encountered a problem. Your document is still open."
+        case .documentChanged: "Your text changed. Try again."
+        case .invalidResponse: "Couldn’t read your text. Try again."
+        case .unavailable: "The editor is unavailable. Your text is still open."
+        case .script: "The editor couldn’t complete that action. Your text is still open."
         }
     }
 }

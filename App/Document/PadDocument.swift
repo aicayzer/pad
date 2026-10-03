@@ -33,18 +33,22 @@ enum PadError: LocalizedError {
     case changed
     case missingFolder
     case invalidName
+    case emptyName
+    case nameTooLong
     case nameExists
     case renamePermission
 
     var errorDescription: String? {
         switch self {
-        case .unsupported: "Choose a .txt or .md file."
-        case .encoding: "This file uses an unsupported text encoding."
-        case .changed: "This file changed elsewhere. Use Save As to keep your changes."
-        case .missingFolder: "This folder is unavailable. Choose it again in Files settings."
-        case .invalidName: "Use a shorter name without slashes or colons."
-        case .nameExists: "A file with that name already exists. Choose another name."
-        case .renamePermission: "PadPad needs access to this folder to rename the file. Use Save As instead."
+        case .unsupported: "Choose a Markdown (.md) or text (.txt) file."
+        case .encoding: "PadPad can’t read this file’s text encoding."
+        case .changed: "This file changed elsewhere. Choose “Save As” to keep your changes."
+        case .missingFolder: "This folder is unavailable. Choose it again in Settings → Files."
+        case .emptyName: "Enter a file name."
+        case .nameTooLong: "This file name is too long. Try a shorter one."
+        case .invalidName: "This file name isn’t valid. Try another name."
+        case .nameExists: "A file with this name already exists. Choose another name."
+        case .renamePermission: "PadPad needs folder access to rename this file. Choose “Save As”."
         }
     }
 }
@@ -117,7 +121,7 @@ final class PadDocument {
     private var baseline: Data?
     private var documentScope: URL?
     private var folderScope: URL?
-    private var panel: PadPanel?
+    private var panel: (any PadDocumentWindow)?
     private var dismissedAt: Date?
     private var scratchFormat: PadFormat
     private var snapshotApplied = false
@@ -220,7 +224,7 @@ final class PadDocument {
         }
         editor.onError = { [weak self] error in
             guard let self, self.currentFormat == .md, !self.onboarding.isPresented else { return }
-            self.error = readableError(error, fallback: "The editor encountered a problem. Your document is still open.")
+            self.error = readableError(error, fallback: "The editor couldn’t complete that action. Your text is still open.")
         }
         editor.onReady = { [weak self] in
             guard let self, !self.onboarding.isPresented, self.currentFormat == .md else { return }
@@ -254,7 +258,7 @@ final class PadDocument {
             text = latest ?? editorLoadedSource
             return true
         } catch {
-            self.error = "Couldn’t read your text. Your document is still open. Try again."
+            self.error = "Couldn’t read your text. Try again."
             onboarding.dismiss()
             show()
             if !isActive, !onboarding.isPresented { panel?.resumeEditor() }
@@ -397,7 +401,7 @@ final class PadDocument {
             folder = chosen
             folderScope = chosen.startAccessingSecurityScopedResource() ? chosen : nil
             error = nil
-        } catch { self.error = readableError(error, fallback: "Couldn’t use this folder. Choose it again.") }
+        } catch { self.error = readableError(error, fallback: "Couldn’t use this folder. Choose another folder.") }
     }
 
     func useDownloads() {
@@ -559,7 +563,7 @@ final class PadDocument {
             return true
         } catch {
             if accessing { file.stopAccessingSecurityScopedResource() }
-            self.error = readableError(error, fallback: "Couldn’t open this file. Try choosing it again.")
+            self.error = readableError(error, fallback: "Couldn’t open this file. Try opening it again.")
             onboarding.dismiss()
             if isQuickPad || url != nil { show() }
             if leavingOnboarding { panel?.resumeEditor() }
@@ -591,7 +595,7 @@ final class PadDocument {
             }
             error = nil
         } catch {
-            self.error = readableError(error, fallback: "Couldn’t read this file. Your document is still open.")
+            self.error = readableError(error, fallback: "Couldn’t read this file. Your text is still open.")
             notice = nil
         }
     }
@@ -634,7 +638,7 @@ final class PadDocument {
             }
             error = nil
             updateTitle()
-        } catch { self.error = readableError(error, fallback: "Couldn’t save this file. Your changes are still open."); notice = nil }
+        } catch { self.error = readableError(error, fallback: "Couldn’t save your changes. Your text is still open."); notice = nil }
     }
 
     func toggleFormat() async {
@@ -678,7 +682,7 @@ final class PadDocument {
                 suggestion = (generated.url.lastPathComponent, generated.number)
             }
         } catch {
-            self.error = readableError(error, fallback: "Couldn’t prepare the filename. Check the name and try again.")
+            self.error = readableError(error, fallback: "Couldn’t create a file name. Check your naming settings.")
             notice = nil
             return
         }
@@ -722,7 +726,7 @@ final class PadDocument {
             updateTitle()
         } catch {
             if accessing { destination.stopAccessingSecurityScopedResource() }
-            self.error = readableError(error, fallback: "Couldn’t save this file. Your changes are still open.")
+            self.error = readableError(error, fallback: "Couldn’t save your changes. Your text is still open.")
             notice = nil
         }
     }
@@ -976,7 +980,7 @@ final class PadDocument {
             updateTitle()
             return true
         } catch {
-            self.error = readableError(error, fallback: "Couldn’t rename this file. Try another name or use Save As.")
+            self.error = readableError(error, fallback: "Couldn’t rename this file. Try another name or choose “Save As”.")
             notice = nil
             return false
         }
@@ -987,10 +991,12 @@ final class PadDocument {
         if let error = error as? PadMarkdownEditorError { return error.localizedDescription }
         if let error = error as? CocoaError {
             switch error.code {
-            case .fileReadNoSuchFile: return "This file is no longer available. Choose it again."
-            case .fileReadNoPermission, .fileWriteNoPermission:
-                return "PadPad doesn’t have access to this file. Use Open or Save As to choose it again."
-            case .fileWriteOutOfSpace: return "There isn’t enough storage to save this file. Free up some space and try again."
+            case .fileReadNoSuchFile: return "This file is no longer available. Choose another file."
+            case .fileReadNoPermission:
+                return "PadPad can’t access this file. Choose it again with “Open File”."
+            case .fileWriteNoPermission:
+                return "PadPad can’t save in this folder. Choose “Save As”."
+            case .fileWriteOutOfSpace: return "There isn’t enough storage to save. Free up some space and try again."
             case .fileWriteFileExists: return PadError.nameExists.localizedDescription
             default: break
             }
@@ -1037,7 +1043,9 @@ final class PadDocument {
         markdownEditor?.allowsFocus = !onboarding.isPresented && currentFormat == .md
         if onboarding.isPresented { isActive = false }
         guard presentsWindow else { return }
-        if panel == nil { panel = PadPanel(files: self) }
+        if panel == nil {
+            panel = isQuickPad ? PadPanel(files: self) : PadFileWindow(files: self)
+        }
         updateTitle()
         if !isQuickPad { NSApp.activate() }
         // Focus cannot succeed before the window is key.

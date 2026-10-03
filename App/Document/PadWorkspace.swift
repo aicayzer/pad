@@ -126,7 +126,7 @@ final class PadWorkspace {
         resetError = nil
         for document in allDocuments {
             guard await document.captureForReset() else {
-                resetError = "Couldn’t reset PadPad. Your writing is still open. Try again."
+                resetError = "Couldn’t reset PadPad. Your writing is still open."
                 return
             }
         }

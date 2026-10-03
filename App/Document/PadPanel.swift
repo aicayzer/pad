@@ -22,19 +22,18 @@ private struct PadShareAnchorView: NSViewRepresentable {
     }
 }
 
-final class PadPanel: NSPanel {
+final class PadPanel: NSPanel, PadDocumentWindow {
     private let files: PadDocument
     private let quit: @MainActor () -> Void
     private var previousFrame: NSRect?
     private var restoreAfterFullScreen = false
     private static let maximumWidth: CGFloat = 1_200
-    private static let centerSnapDistance: CGFloat = 20
     private var trackingWindowMove = false
-    private var pendingCenterSnap: DispatchWorkItem?
+    private var snapTrackingTimer: Timer?
+    private lazy var snapGuide = PadSnapGuide()
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
-    private lazy var errorBanner = PadErrorBanner(owner: self)
 
     var pendingEditorEventCount: Int { pendingEditorInput.eventCount }
 
@@ -49,7 +48,7 @@ final class PadPanel: NSPanel {
         let height = files.isQuickPad ? settings?.quickPadHeight ?? 480 : settings?.fileWindowHeight ?? 860
         let mask: NSWindow.StyleMask = files.isQuickPad
             ? [.titled, .resizable, .fullSizeContentView, .nonactivatingPanel]
-            : [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            : [.titled, .closable, .miniaturizable, .resizable]
         super.init(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
                    styleMask: mask,
                    backing: .buffered, defer: false)
@@ -69,8 +68,6 @@ final class PadPanel: NSPanel {
             }
         } else {
             collectionBehavior = [.fullScreenPrimary, .fullScreenAllowsTiling]
-            // The Window command menu lists these document controllers explicitly.
-            isExcludedFromWindowsMenu = true
         }
         // AppKit draws outside the window; a SwiftUI shadow gets clipped at the hosting bounds.
         hasShadow = true
@@ -79,8 +76,6 @@ final class PadPanel: NSPanel {
             guard let self else { return }
             pendingTitleInput.discardEvents()
             makeFirstResponder(pendingTitleInput)
-        }, presentError: { [weak self] message in
-            self?.errorBanner.show(message)
         }).environment(files.appSettings ?? AppSettings())
             // Hosting derives the native minimum from the content's constraints.
             .frame(minWidth: 520, maxWidth: files.isQuickPad ? Self.maximumWidth : nil, minHeight: 320))
@@ -94,8 +89,6 @@ final class PadPanel: NSPanel {
                                                name: NSWindow.willMoveNotification, object: self)
         NotificationCenter.default.addObserver(self, selector: #selector(windowMoved),
                                                name: NSWindow.didMoveNotification, object: self)
-        NotificationCenter.default.addObserver(self, selector: #selector(windowResized),
-                                               name: NSWindow.didResizeNotification, object: self)
         NotificationCenter.default.addObserver(self, selector: #selector(exitedFullScreen),
                                                name: NSWindow.didExitFullScreenNotification, object: self)
         restoreDefaultSize(animate: false)
@@ -108,52 +101,63 @@ final class PadPanel: NSPanel {
         }
     }
 
-    @objc private func windowResized() { errorBanner.show(files.error) }
-
     override func orderOut(_ sender: Any?) {
-        errorBanner.hide()
+        endSnapTracking(commit: false)
         super.orderOut(sender)
     }
 
     @objc private func windowWillMove() {
-        trackingWindowMove = NSEvent.pressedMouseButtons & 1 != 0
+        guard files.isQuickPad, !styleMask.contains(.fullScreen),
+              files.appSettings?.snapQuickPadToCenter != false,
+              NSEvent.pressedMouseButtons & 1 != 0 else { return }
+        trackingWindowMove = true
+        updateSnapGuide()
+        guard snapTrackingTimer == nil else { return }
+        // Native window dragging uses the event-tracking run loop. Keep preview
+        // and release detection active there as well as after dragging returns.
+        let timer = Timer(timeInterval: 1.0 / 60, target: self,
+                          selector: #selector(trackSnapDrag), userInfo: nil, repeats: true)
+        snapTrackingTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        RunLoop.main.add(timer, forMode: .eventTracking)
     }
 
     @objc private func windowMoved() {
-        errorBanner.position()
-        guard files.isQuickPad, files.appSettings?.snapQuickPadToCenter != false, trackingWindowMove else { return }
-        scheduleCenterSnap()
+        if trackingWindowMove { updateSnapGuide() }
     }
 
-    private func scheduleCenterSnap() {
-        pendingCenterSnap?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            // Native dragging runs its own event loop. Wait until the mouse is
-            // released, so a pause during a drag never pulls the window away.
-            if NSEvent.pressedMouseButtons & 1 != 0 {
-                self.scheduleCenterSnap()
-                return
-            }
-            self.pendingCenterSnap = nil
-            self.trackingWindowMove = false
-            self.snapNearCenter()
+    @objc private func trackSnapDrag() {
+        guard isVisible, files.appSettings?.snapQuickPadToCenter != false else {
+            endSnapTracking(commit: false)
+            return
         }
-        pendingCenterSnap = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+        if NSEvent.pressedMouseButtons & 1 == 0 {
+            endSnapTracking(commit: true)
+        } else {
+            updateSnapGuide()
+        }
     }
 
-    private func snapNearCenter() {
-        guard isVisible, let screen else { return }
-        let visible = screen.visibleFrame
-        var target = frame
-        if abs(frame.midX - visible.midX) <= Self.centerSnapDistance {
-            target.origin.x = visible.midX - frame.width / 2
-        }
-        if abs(frame.midY - visible.midY) <= Self.centerSnapDistance {
-            target.origin.y = visible.midY - frame.height / 2
-        }
-        guard target.origin != frame.origin else { return }
+    private func snapDestination() -> NSRect? {
+        // Follow the pointer's display while crossing between screens.
+        guard let display = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
+                ?? screen ?? NSScreen.main else { return nil }
+        return PadQuickPadPlacement.frame(size: frame.size, in: display.visibleFrame)
+    }
+
+    private func updateSnapGuide() {
+        guard let target = snapDestination() else { return }
+        snapGuide.show(target: target, near: PadQuickPadPlacement.isNear(frame, target: target), below: self)
+    }
+
+    private func endSnapTracking(commit: Bool) {
+        let wasTracking = trackingWindowMove
+        trackingWindowMove = false
+        snapTrackingTimer?.invalidate()
+        snapTrackingTimer = nil
+        snapGuide.hide()
+        guard commit, wasTracking, let target = snapDestination(),
+              PadQuickPadPlacement.isNear(frame, target: target) else { return }
         setFrameOrigin(target.origin)
     }
 
@@ -298,7 +302,6 @@ final class PadPanel: NSPanel {
     override func close() { files.close() }
 
     func finishClosing() {
-        errorBanner.hide()
         super.close()
     }
 
@@ -316,9 +319,11 @@ final class PadPanel: NSPanel {
         let size = NSSize(width: min(width, visible.width), height: min(height, visible.height))
         previousFrame = nil
         setFrame(NSRect(origin: frame.origin, size: size), display: true, animate: animate)
-        // Preserve AppKit's optical centering, which places a writing window slightly
-        // above the geometric midpoint. It also chooses the window's current display.
-        center()
+        if files.isQuickPad {
+            setFrameOrigin(PadQuickPadPlacement.frame(size: size, in: screen.visibleFrame).origin)
+        } else {
+            center()
+        }
         setFrame(constrainFrameRect(frame, to: screen), display: true)
     }
 
@@ -357,7 +362,6 @@ final class PadPanel: NSPanel {
         super.becomeKey()
         files.workspace?.didFocus(files)
         files.refreshIfNeeded()
-        errorBanner.show(files.error)
         files.settingsPresented = false
         guard !files.onboarding.isPresented else {
             files.isActive = false
@@ -399,14 +403,13 @@ final class PadPanel: NSPanel {
 
 }
 
-private struct PadView: View {
+struct PadView: View {
     // Retained for a future return to inline formatting controls.
     private static let usesCenteredFormattingToolbar = false
     @Environment(AppSettings.self) private var settings
     @Environment(\.openSettings) private var openSettings
     @Bindable var files: PadDocument
     let prepareTitleFocus: () -> Void
-    let presentError: (String?) -> Void
     @State private var renaming = false
     @State private var titleDraft = ""
     @State private var renameWidth: CGFloat = 100
@@ -434,7 +437,6 @@ private struct PadView: View {
         .onAppear {
             let action = openSettings
             files.showSettings = { action() }
-            presentError(files.error)
         }
         .onDrop(of: ["public.file-url"], isTargeted: nil) { providers in
             let workspace = files.workspace
@@ -446,7 +448,6 @@ private struct PadView: View {
             }
             return !providers.isEmpty
         }
-        .onChange(of: files.error) { _, message in presentError(message) }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             shortcut = KeyboardShortcuts.getShortcut(for: .pad)
         }
@@ -456,38 +457,34 @@ private struct PadView: View {
         }
     }
 
-    private var editorContent: some View {
+    private var editorLayout: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 let centerWidth: CGFloat = Self.usesCenteredFormattingToolbar && showingFormatting && files.currentFormat == .md
                     ? (geometry.size.width >= 820 ? 280 : geometry.size.width >= 700 ? 144 : 36) : 0
                 let titleSpace = Self.usesCenteredFormattingToolbar && showingFormatting
                     ? max(40, (geometry.size.width - centerWidth) / 2 - 100)
-                    : max(40, geometry.size.width - (files.isQuickPad ? 216 : 270))
+                    : max(40, geometry.size.width - 216)
                 ZStack {
                     HStack(spacing: 6) {
-                        if files.isQuickPad {
-                            Button { files.close() } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 14, height: 14)
-                                    .frame(width: 22, height: 26)
-                            }
-                            .padding(.trailing, -2)
-                            .accessibilityLabel("Close PadPad")
-                        } else {
-                            Color.clear.frame(width: 70, height: 26)
+                        Button { files.close() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 14, height: 14)
+                                .frame(width: 22, height: 26)
                         }
+                        .padding(.trailing, -2)
+                        .accessibilityLabel(files.isQuickPad ? "Close PadPad" : "Close file")
                         HStack(spacing: 5) {
                             if renaming {
                                 HStack(spacing: 2) {
                                     OverlaySearchField(placeholder: "Name", text: $titleDraft, fontSize: 14,
                                                        fontWeight: .semibold, selectsTextOnFocus: true,
                                                        isCurrent: { renaming && files.isActive && renamedDocument == files.documentID },
-                                                       submit: commitRename,
-                                                       dismiss: finishRename,
-                                                       blur: { renaming = false })
+                                                       submit: { commitRename() },
+                                                       dismiss: { finishRename() },
+                                                       blur: { commitRename(refocus: false) })
                                         .frame(width: min(renameWidth, max(40, titleSpace - 36)))
                                 }
                                 .frame(height: 22)
@@ -506,10 +503,6 @@ private struct PadView: View {
                         .frame(maxWidth: titleSpace + 12, alignment: .leading)
                         Spacer(minLength: 0)
                         HStack(spacing: 2) {
-                            actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
-                                files.share(from: shareAnchor.view)
-                            }
-                            .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
                             if files.currentFormat == .md, let editor = files.markdownEditor {
                                 Group {
                                     if Self.usesCenteredFormattingToolbar {
@@ -544,8 +537,10 @@ private struct PadView: View {
                                     }
                                 }
                             }
-
-
+                            actionIcon("square.and.arrow.up", label: "Share", verticalOffset: -1) {
+                                files.share(from: shareAnchor.view)
+                            }
+                            .background(PadShareAnchorView(anchor: shareAnchor).allowsHitTesting(false))
                         }
                         .fixedSize()
                         Button("Save") { files.save() }
@@ -563,7 +558,6 @@ private struct PadView: View {
                 .frame(width: geometry.size.width, height: 38)
             }
             .frame(height: 38)
-            .background(PadWindowControlsAnchor())
             .buttonStyle(.plain)
             .font(.system(size: 14, weight: .medium))
             .foregroundStyle(.secondary)
@@ -600,12 +594,17 @@ private struct PadView: View {
                         .padding([.horizontal, .top], 10)
                 }
                 HStack(alignment: .bottom, spacing: 12) {
-                    if let notice = files.notice {
-                        Text(notice)
-                            .foregroundStyle(.secondary)
+                    if let message = files.error ?? files.notice {
+                        Text(message)
+                            .font(.system(size: 13))
+                            .foregroundStyle(files.error != nil ? Color("ErrorColor") : Color.secondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .glassEffect(.regular, in: .capsule)
+                            .accessibilityIdentifier(files.error != nil ? "documentError" : "documentNotice")
+                            .accessibilityLabel(files.error != nil ? "Error: \(message)" : message)
                     }
                     Spacer(minLength: 0)
                     if settings.showFormatToggle, files.isQuickPad, files.url == nil {
@@ -627,7 +626,10 @@ private struct PadView: View {
             .clipShape(RoundedRectangle(cornerRadius: 15))
             .padding([.horizontal, .bottom], 7)
         }
-        // AppKit owns the outside shape, shadow and resize border as one native rounded frame.
+    }
+
+    private var editorContent: some View {
+        editorLayout
         .glassEffect(.regular, in: .rect)
         .ignoresSafeArea()
         .tint(settings.accentColor)
@@ -637,13 +639,13 @@ private struct PadView: View {
             let action = openSettings
             files.showSettings = { action() }
         }
-        .onChange(of: files.documentID) { finishRename() }
+        .onChange(of: files.documentID) { finishRename(refocus: false) }
         .onChange(of: files.currentFormat) { showingFormatting = false }
         .onChange(of: files.isActive, initial: true) {
             if files.isActive {
                 if !renaming { editing = true }
-            } else {
-                renaming = false
+            } else if renaming {
+                commitRename(refocus: false)
             }
         }
     }
@@ -662,21 +664,27 @@ private struct PadView: View {
         renaming = true
     }
 
-    private func commitRename() {
+    private func commitRename(refocus: Bool = true) {
         guard renaming, renamedDocument == files.documentID else { return }
-        // An unsuccessful attempt keeps the original name. End the attempt
-        // and let the banner explain it without trapping the field editor.
-        _ = files.rename(to: titleDraft)
-        finishRename()
+        if titleDraft.trimmingCharacters(in: .whitespacesAndNewlines) != files.editableName {
+            // A failed rename preserves the original name and leaves the editor usable.
+            _ = files.rename(to: titleDraft)
+        }
+        finishRename(refocus: refocus)
     }
 
-    private func finishRename() {
+    private func finishRename(refocus: Bool = true) {
         renaming = false
-        editing = files.isActive
-        // Let SwiftUI remove the native rename field before focusing WebKit.
-        // Focusing first can lose the new responder when that field unmounts.
+        if refocus { editing = files.isActive }
+        // Let the clicked control take focus before choosing a fallback for blank header space.
         DispatchQueue.main.async {
             guard files.isActive, !renaming else { return }
+            if !refocus {
+                guard let window = files.nativeWindow, window.isKeyWindow,
+                      window.attachedSheet == nil,
+                      window.firstResponder == nil || window.firstResponder === window else { return }
+                editing = true
+            }
             files.markdownEditor?.focus()
         }
     }
@@ -752,6 +760,6 @@ private struct EditorFocusMount: NSViewRepresentable {
             requestFocus()
         }
 
-        func requestFocus() { (window as? PadPanel)?.requestEditorFocus() }
+        func requestFocus() { (window as? any PadDocumentWindow)?.requestEditorFocus() }
     }
 }

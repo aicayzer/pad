@@ -45,16 +45,17 @@ enum PadFilename {
     static func filename(stem: String, extension fileExtension: String) throws -> String {
         let stem = try validatedStem(stem)
         let filename = "\(stem).\(fileExtension)"
-        guard filename.utf8.count <= 255 else { throw PadError.invalidName }
+        guard filename.utf8.count <= 255 else { throw PadError.nameTooLong }
         return filename
     }
 
     static func validatedStem(_ input: String) throws -> String {
         let stem = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !stem.isEmpty else { throw PadError.emptyName }
+        guard stem.utf8.count <= 255 else { throw PadError.nameTooLong }
         guard input.rangeOfCharacter(from: .controlCharacters) == nil,
-              !stem.isEmpty, stem != ".", stem != "..",
-              !stem.contains("/"), !stem.contains("\\"), !stem.contains(":"),
-              stem.utf8.count <= 255 else {
+              stem != ".", stem != "..",
+              !stem.contains("/"), !stem.contains("\\"), !stem.contains(":") else {
             throw PadError.invalidName
         }
         return stem
