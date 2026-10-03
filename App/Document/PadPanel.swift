@@ -22,7 +22,7 @@ private struct PadShareAnchorView: NSViewRepresentable {
     }
 }
 
-final class PadPanel: NSPanel {
+final class PadPanel: NSPanel, PadDocumentWindow {
     private let files: PadDocument
     private let quit: @MainActor () -> Void
     private var previousFrame: NSRect?
@@ -31,7 +31,6 @@ final class PadPanel: NSPanel {
     private var trackingWindowMove = false
     private var snapTrackingTimer: Timer?
     private lazy var snapGuide = PadSnapGuide()
-    private var fileToolbar: PadFileToolbar?
     private let pendingTitleInput = OverlayInputResponder()
     private let pendingEditorInput = MarkdownInputBuffer()
     private var editorFocusScheduled = false
@@ -85,14 +84,6 @@ final class PadPanel: NSPanel {
             .frame(minWidth: 520, maxWidth: files.isQuickPad ? Self.maximumWidth : nil, minHeight: 320))
         maxSize = NSSize(width: files.isQuickPad ? Self.maximumWidth : CGFloat.greatestFiniteMagnitude,
                          height: CGFloat.greatestFiniteMagnitude)
-        if !files.isQuickPad {
-            titleVisibility = .visible
-            toolbarStyle = .unified
-            let fileToolbar = PadFileToolbar(files: files)
-            self.fileToolbar = fileToolbar
-            toolbar = fileToolbar.toolbar
-            isExcludedFromWindowsMenu = false
-        }
         pendingEditorInput.attach(to: self)
         pendingEditorInput.onInput = { [weak self] in self?.requestEditorFocus() }
         NotificationCenter.default.addObserver(self, selector: #selector(applicationBecameActive),
@@ -423,7 +414,7 @@ final class PadPanel: NSPanel {
 
 }
 
-private struct PadView: View {
+struct PadView: View {
     // Retained for a future return to inline formatting controls.
     private static let usesCenteredFormattingToolbar = false
     @Environment(AppSettings.self) private var settings
@@ -475,12 +466,17 @@ private struct PadView: View {
             shortcut = KeyboardShortcuts.getShortcut(for: .pad)
         }
         .onChange(of: files.renameRequest) { _, _ in beginRename() }
+        .alert("Rename", isPresented: Binding(get: { !files.isQuickPad && renaming }, set: { renaming = $0 })) {
+            TextField("Name", text: $titleDraft)
+            Button("Cancel", role: .cancel) { finishRename() }
+            Button("Rename") { commitRename() }
+        }
         .onChange(of: files.onboarding.isPresented) { _, presented in
             if presented { editing = false; renaming = false; showingFormatting = false }
         }
     }
 
-    private var editorContent: some View {
+    private var editorLayout: some View {
         VStack(spacing: 0) {
             if files.isQuickPad {
             GeometryReader { geometry in
@@ -603,6 +599,7 @@ private struct PadView: View {
                 if files.currentFormat == .md {
                     if let editor = files.markdownEditor {
                         PadMarkdownEditorView(editor: editor)
+                            .modifier(PadFileLinkPresenter(editor: editor, enabled: !files.isQuickPad))
                             .onChange(of: settings.readingWidth, initial: true) {
                                 editor.setReadingWidth(readingColumnWidth)
                             }
@@ -648,12 +645,19 @@ private struct PadView: View {
                 .padding(.bottom, 8)
             }
             .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 15))
-            .padding([.horizontal, .bottom], 7)
+            .clipShape(RoundedRectangle(cornerRadius: files.isQuickPad ? 15 : 0))
+            .padding([.horizontal, .bottom], files.isQuickPad ? 7 : 0)
         }
-        // AppKit owns the outside shape, shadow and resize border as one native rounded frame.
-        .glassEffect(.regular, in: .rect)
-        .ignoresSafeArea()
+    }
+
+    private var editorContent: some View {
+        Group {
+            if files.isQuickPad {
+                editorLayout.glassEffect(.regular, in: .rect).ignoresSafeArea()
+            } else {
+                editorLayout
+            }
+        }
         .tint(settings.accentColor)
         .disabled(files.isBusy || files.workspace?.isTransitioning == true)
         .defaultFocus($editing, true)
@@ -776,6 +780,15 @@ private struct EditorFocusMount: NSViewRepresentable {
             requestFocus()
         }
 
-        func requestFocus() { (window as? PadPanel)?.requestEditorFocus() }
+        func requestFocus() { (window as? any PadDocumentWindow)?.requestEditorFocus() }
+    }
+}
+
+private struct PadFileLinkPresenter: ViewModifier {
+    let editor: PadMarkdownEditorController
+    let enabled: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if enabled { content.modifier(PadMarkdownLinkPresenter(editor: editor)) }
+        else { content }
     }
 }

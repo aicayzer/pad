@@ -117,7 +117,7 @@ final class PadDocument {
     private var baseline: Data?
     private var documentScope: URL?
     private var folderScope: URL?
-    private var panel: PadPanel?
+    private var panel: (any PadDocumentWindow)?
     private var dismissedAt: Date?
     private var scratchFormat: PadFormat
     private var snapshotApplied = false
@@ -1037,7 +1037,9 @@ final class PadDocument {
         markdownEditor?.allowsFocus = !onboarding.isPresented && currentFormat == .md
         if onboarding.isPresented { isActive = false }
         guard presentsWindow else { return }
-        if panel == nil { panel = PadPanel(files: self) }
+        if panel == nil {
+            panel = isQuickPad ? PadPanel(files: self) : PadFileWindow(files: self)
+        }
         updateTitle()
         if !isQuickPad { NSApp.activate() }
         // Focus cannot succeed before the window is key.

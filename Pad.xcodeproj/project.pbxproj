@@ -45,6 +45,7 @@
 		AEECD88F21AC692E219E1451 /* AppIconDEV.icon in Resources */ = {isa = PBXBuildFile; fileRef = 621D41FA4140656C065BF7AB /* AppIconDEV.icon */; };
 		B1F5177795B98FEDD4CF958A /* OnboardingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CB4289D8878A8C20969388 /* OnboardingTests.swift */; };
 		BA1EC19F6B9F64C9F2D9D824 /* EditingShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5022E10846FC0482266233 /* EditingShortcutTests.swift */; };
+		C2D3C0F1178FE34A3971584B /* PadFileWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EDC0F42499E11CD100AE7CC /* PadFileWindow.swift */; };
 		C3D25C2DE6A2FC6208665816 /* PadUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A999B97A56ADD25994D11B77 /* PadUITests.swift */; };
 		C53F5B43A8E926B392C18919 /* MarkdownBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BECEC51394BCF6B42FC781 /* MarkdownBridgeTests.swift */; };
 		CA8127CCE4527D011AE2265C /* SettingsEditingDismissal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 862FD4BCEA3FD573B9CCC820 /* SettingsEditingDismissal.swift */; };
@@ -85,6 +86,7 @@
 		0392D340A7C705FD23E9B042 /* PadPlainTextEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadPlainTextEditorView.swift; sourceTree = "<group>"; };
 		04BF215CC52C94086A9E4F54 /* MarkdownUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownUITests.swift; sourceTree = "<group>"; };
 		0AC85B4C5EF3BDE2FF730BC8 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		0EDC0F42499E11CD100AE7CC /* PadFileWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadFileWindow.swift; sourceTree = "<group>"; };
 		11BECEC51394BCF6B42FC781 /* MarkdownBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBridgeTests.swift; sourceTree = "<group>"; };
 		17CB4289D8878A8C20969388 /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
 		1928D9C35CF545CF60727141 /* PadOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadOnboardingView.swift; sourceTree = "<group>"; };
@@ -193,6 +195,7 @@
 				74C8DF72BB2C3BB218D87836 /* PadErrorBanner.swift */,
 				30C08C107A050CE1BE5CFD47 /* PadFilename.swift */,
 				CF0F58249969C5861F5BC9B5 /* PadFileToolbar.swift */,
+				0EDC0F42499E11CD100AE7CC /* PadFileWindow.swift */,
 				6D5F9400C1E9EF196E78434E /* PadNamingSettings.swift */,
 				34C1A9D1A42A38485980FBF8 /* PadPanel.swift */,
 				6C59CA268261F98DFDEA527F /* PadSnapGuide.swift */,
@@ -453,6 +456,7 @@
 				D56D42DE1FB158F6514486C4 /* PadDocument.swift in Sources */,
 				F205CDF5CBB328F4B6B9F5B8 /* PadErrorBanner.swift in Sources */,
 				8A5A62B62B343A5FD3B2E3D8 /* PadFileToolbar.swift in Sources */,
+				C2D3C0F1178FE34A3971584B /* PadFileWindow.swift in Sources */,
 				08C4CCDBFAEBCEA878B7136A /* PadFilename.swift in Sources */,
 				1E8EF55943DDB98C48CA2568 /* PadMarkdownEditorController.swift in Sources */,
 				2F59C1F6B0F4A22BFABD369F /* PadMarkdownEditorView.swift in Sources */,
